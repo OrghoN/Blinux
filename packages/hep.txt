@@ -1,0 +1,17 @@
+# blinux-hep: high energy physics, optional.
+root
+geant4
+pythia8
+hepmc
+fastjet
+fastjet-contrib
+lhapdf
+python-uproot
+python-awkward
+python-hist
+apptainer
+gcc-fortran
+boost
+eigen
+gsl
+# Not packaged: delphes (install from source or in an apptainer image).

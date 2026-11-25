@@ -1,0 +1,6 @@
+# blinux-ml-cuda: blinux-ml with GPU PyTorch. Only installed with graphics choice 3.
+# python-pytorch-cuda provides python-pytorch, so it satisfies blinux-ml's dependency.
+blinux-ml
+python-pytorch-cuda
+cuda
+cudnn

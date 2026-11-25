@@ -1,0 +1,13 @@
+# blinux-ml: machine learning on the CPU, optional.
+# JAX is not included: its AUR package (python-jaxlib) compiles XLA from source,
+# which is too heavy for CI. Use "uv pip install jax" per project instead.
+python-numpy
+python-scipy
+python-pandas
+python-scikit-learn
+python-matplotlib
+python-h5py
+python-rich
+python-pytorch
+jupyterlab
+ipython

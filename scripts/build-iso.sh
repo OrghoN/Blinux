@@ -57,6 +57,9 @@ read_list() {
     sed -e 's/#.*//' -e 's/[[:space:]]\+$//' -e '/^$/d' "$@"
 }
 
+# Live ISO packages: the releng set plus packages/iso.txt.
+read_list "$ROOT/packages/iso.txt" >>"$PROFILE/packages.x86_64"
+
 if ((OFFLINE)); then
     offline="$PROFILE/airootfs/opt/blinux/offline-repo"
     dbpath="$BUILD_DIR/offline-db"

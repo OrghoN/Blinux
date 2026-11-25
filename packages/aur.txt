@@ -1,3 +1,3 @@
-# AUR packages built into [blinux]. Pinned in aur.lock (make lock).
-# AUR helper, so it works from first boot.
-yay
+# Extra AUR packages to build into [blinux].
+# AUR packages named in the stack lists (base.txt, hep.txt, ...) are found
+# automatically by `make lock`; only list packages here that no stack names.

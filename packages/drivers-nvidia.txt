@@ -1,0 +1,5 @@
+# Graphics choice 2: NVIDIA proprietary (Turing and newer GPUs).
+# Install-time choice only. Never in base.txt or on the ISO.
+nvidia-open
+nvidia-utils
+nvidia-settings

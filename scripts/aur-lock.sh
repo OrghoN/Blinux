@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # Re-resolve every AUR package Blinux needs and pin it in packages/aur.lock.
 #
-# Inputs:  packages/aur.txt, plus the depends/makedepends of pkgbuilds/*
-#          that the official repos can't satisfy.
+# Inputs:  every name in packages/*.txt (stack lists, drivers, aur.txt) that
+#          the official repos can't satisfy, plus the depends/makedepends of
+#          pkgbuilds/*.
 # Output:  packages/aur.lock ("<pkgbase> <version> <commit>", build order).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-mapfile -t names < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' packages/aur.txt)
+mapfile -t names < <(
+    for f in packages/*.txt; do
+        [[ "$f" == packages/ignore.txt ]] && continue
+        sed -e 's/#.*//' -e 's/[[:space:]]//g' -e '/^$/d' -e '/^@/d' "$f"
+    done | sort -u
+)
 mapfile -t local_pkgs < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' pkgbuilds/ORDER)
 
 # Our own packages (and their split package names) are built locally.

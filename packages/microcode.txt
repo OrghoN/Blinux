@@ -1,0 +1,4 @@
+# CPU microcode. The installer detects the vendor and installs one of these.
+# Both are in the offline cache.
+intel-ucode
+amd-ucode

@@ -1,0 +1,8 @@
+# Extra packages on the live ISO on top of the releng set (profile/packages.x86_64).
+# The installer and its tools:
+blinux-tools
+jq
+gptfdisk
+arch-install-scripts
+yay
+base-devel

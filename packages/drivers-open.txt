@@ -1,0 +1,5 @@
+# Graphics choice 1 (default): open-source drivers. In the offline cache.
+mesa
+vulkan-intel
+vulkan-radeon
+intel-media-driver

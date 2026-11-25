@@ -1,0 +1,14 @@
+# blinux-docs: TeX, document conversion and braille translation, optional.
+texlive-basic
+texlive-latex
+texlive-latexrecommended
+texlive-latexextra
+texlive-fontsrecommended
+texlive-mathscience
+texlive-bibtexextra
+texlive-xetex
+texlive-luatex
+texlive-binextra        # latexmk and friends
+texlive-pictures
+pandoc-cli
+liblouis

@@ -1,0 +1,94 @@
+# blinux-base: always installed, and carried on the ISO as an offline cache.
+# One package per line. "@name" expands a pacman group when the meta-package
+# is generated (make meta). Seeded from the author's machine on 2026-11-25.
+
+# --- System
+base
+linux
+linux-headers
+linux-firmware
+sof-firmware            # Intel SOF audio; without it many laptops have no sound, so no speech
+networkmanager
+iwd
+sudo
+efibootmgr
+grub                    # BIOS installs; UEFI installs use systemd-boot
+dosfstools
+mtools
+ntfs-3g
+cryptsetup
+openssh
+rsync
+reflector
+man-db
+unzip
+zip
+bluez
+bluez-utils
+
+# --- Build tools and AUR
+base-devel
+git
+yay
+
+# --- Audio: PulseAudio is the sound server; PipeWire only does screen capture and video.
+#     Never pipewire-pulse or wireplumber (see docs/build-plan.md, "Audio and speech").
+pulseaudio
+pulseaudio-alsa
+pulseaudio-bluetooth
+pipewire
+pipewire-media-session
+alsa-utils
+alsa-plugins
+alsa-ucm-conf
+sox
+
+# --- Speech and braille
+espeak-ng
+speech-dispatcher
+espeakup
+orca
+brltty
+
+# --- Desktop: GNOME on Wayland, XWayland for X11 apps, no Xorg session
+@gnome
+gdm
+xorg-xwayland
+xdg-desktop-portal-gnome
+xdg-user-dirs-gtk
+firefox
+evince                  # PDF viewer that works with Orca
+gnome-terminal          # Orca reads it well; gnome-console is also installed
+localsearch
+
+# --- Shell (oh-my-zsh by default; zoxide, fzf, powerlevel10k for the author's dotfiles)
+zsh
+oh-my-zsh-git
+zsh-theme-powerlevel10k-git
+ttf-meslo-nerd
+zoxide
+fzf
+
+# --- Editor: Emacs with Emacspeak (built from source per T.V. Raman)
+emacs
+emacspeak
+tcl
+tclx                    # Emacspeak's Tcl speech servers need it
+speech-rule-engine      # spoken math in Emacspeak without AsTeR ("poor man's AsTeR")
+
+# --- Core development
+gcc
+clang
+cmake
+ninja
+gdb
+python
+python-pip
+uv
+nodejs
+npm
+jq
+
+# --- Blinux
+blinux-tools
+blinux-config

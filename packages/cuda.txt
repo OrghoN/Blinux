@@ -1,0 +1,4 @@
+# Graphics choice 3 adds CUDA on top of drivers-nvidia.txt.
+# Install-time choice only. Never in base.txt or on the ISO.
+cuda
+cudnn
