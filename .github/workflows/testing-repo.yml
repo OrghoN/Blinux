@@ -1,0 +1,48 @@
+# CD for [blinux-testing]: every merge to main that touches packages rebuilds
+# what changed, signs it with the testing subkey, and publishes it to the
+# rolling "repo-testing" release for dogfooding on real machines.
+name: testing-repo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pkgbuilds/**'
+      - 'packages/**'
+      - 'tools/**'
+      - 'config/**'
+      - 'scripts/build-repo.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testing-repo
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    environment: testing
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: scripts/ci/free-disk.sh
+      - name: Import the testing signing subkey
+        env:
+          SIGNING_KEY: ${{ secrets.BLINUX_TESTING_GPG_KEY }}
+          SIGNING_PASSPHRASE: ${{ secrets.BLINUX_TESTING_GPG_PASSPHRASE }}
+        run: scripts/ci/import-key.sh
+      - name: Start from the current [blinux-testing]
+        run: scripts/repo-release.sh fetch repo-testing
+      - name: Build changed packages
+        run: scripts/ci/arch-run.sh "devtools" scripts/build-repo.sh
+      - name: Smoke-test before publishing
+        run: scripts/ci/arch-run.sh "devtools arch-install-scripts" make --no-print-directory packages-tests
+      - name: Publish to the repo-testing release
+        run: scripts/repo-release.sh publish repo-testing

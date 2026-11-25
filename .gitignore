@@ -1,0 +1,15 @@
+# build outputs
+/build/
+/out/
+/work/
+/repo/
+*.iso
+*.pkg.tar.*
+# editor files
+\#*#
+.#*
+*~
+# python
+__pycache__/
+.venv/
+.pytest_cache/
