@@ -14,7 +14,7 @@ The audio stack copies the author's working machine: **PulseAudio** is the sound
 | 1 | Talking live ISO | Boots with espeakup speech by default; can install vanilla Arch |
 | 2 | Accessible desktop | Installed system auto-starts GNOME (Wayland) + Orca at GDM and in the session; audio servers coexist without fighting over the device |
 | 3 | Shell and editor | zsh/oh-my-zsh default; Emacs + Emacspeak working with speech server |
-| 4 | Technical reading | Aster (Emacspeak's audio math/doc layer) working on LaTeX/TeX docs |
+| 4 | Technical reading | AsTeR (aster-math + Software DECtalk) reading LaTeX math; SRE math in Emacspeak by default |
 | 5 | Dotfiles integration | Installer optionally clones and applies `OrghoN/.dotfiles` |
 | 6 | HEP + ML stacks | ROOT, Geant4, Python scientific stack, PyTorch/JAX, CUDA option |
 | 7 | Release | Signed ISO, checksums, docs, accessibility test pass |
@@ -44,7 +44,7 @@ The audio stack copies the author's working machine: **PulseAudio** is the sound
 
 ### Risks and open questions
 
-- **Emacspeak and Aster are AUR or not packaged at all.** Aster in particular is old and may need porting or reviving. A PKGBUILD has to be maintained.
+- **Emacspeak and AsTeR are built from source** (Raman's instructions), so their PKGBUILDs have to track upstream. AsTeR also depends on Software DECtalk, which has to be built and packaged too.
 - **Audio contention.** espeakup (a root system service), speech-dispatcher, PulseAudio and PipeWire all touch the sound card. The author's machine runs them side by side. Blinux reproduces that exact setup (see "Audio and speech") instead of inventing a new one, but the GDM-to-session and TTY-to-desktop hand-offs still need testing on every release.
 - **Wayland gaps.** Blinux is Wayland-only: GNOME on Wayland, with XWayland for X11 apps, and no Xorg session. Orca on Wayland still has a few gaps (some global keyboard grabs and apps that are only half Wayland-native). Track them in Orca's issue tracker instead of shipping an X11 fallback.
 - **CUDA and proprietary drivers** can't be shipped freely in every configuration. Make them an install-time choice.
@@ -78,11 +78,12 @@ blinux/
 │   ├── dev.txt                # git, compilers, emacs, zsh, ...
 │   ├── hep.txt                # root, geant4, ...
 │   ├── ml.txt                 # python-pytorch, jupyter, ...
-│   └── aur.txt                # emacspeak, aster, oh-my-zsh-git, ...
+│   └── aur.txt                # tclx, slime, oh-my-zsh-git, ...
 ├── pkgbuilds/                 # PKGBUILDs for the [blinux] repo
 │   ├── yay/                   # AUR helper, prebuilt so it's there from first boot
 │   ├── emacspeak/
-│   ├── aster/
+│   ├── aster-math/            # AsTeR, per Raman's 2022 blog post
+│   ├── dectalk/               # Software DECtalk, needed by AsTeR
 │   └── blinux-config/         # meta + config package (see the `blinux-config` section)
 ├── installer/                 # talking install script
 ├── scripts/
@@ -199,15 +200,46 @@ Then: partition → pacstrap base + `base-devel` + `git` + `yay` + `blinux-confi
 - **Post-install stacks:** the HEP/ML bundles that need AUR packages (e.g. `geant4`, `delphes`) can be installed after setup with `yay -S blinux-hep`. They also come prebuilt in `[blinux]`, so yay mostly handles the user's own extras.
 - **Test:** after install, run `yay -S --noconfirm` on a small AUR package as the new user in the QEMU test.
 
-### 10. Emacs, Emacspeak and Aster
+### 10. Emacs, Emacspeak and AsTeR
 
-- `emacs` (official repo) and `emacspeak` (AUR, rebuilt into `[blinux]`). Emacspeak needs a speech server: use the `espeak` server or `espeakup`-compatible TTS so the voice matches the rest of the system.
-- A site-start snippet: `(load "/usr/share/emacs/site-lisp/emacspeak/lisp/emacspeak-setup.el")`, gated on an env var so it can be turned off.
-- **Aster** (Audio System for Technical Readings, T.V. Raman) is historic and not packaged. Plan:
-  1. Find out what's current. Much of Aster's capability lives on inside Emacspeak (e.g. `emacspeak-maths` with the MathJax/speech-rule-engine backend).
-  2. Package `speech-rule-engine` (Node) and Emacspeak's maths server for spoken LaTeX/MathML.
-  3. If the original Aster code is still wanted, fork it into `pkgbuilds/aster/` and port it to current Emacs.
-- Also consider adding `texlive`, `pandoc`, `brltty` and `liblouis` for braille and document conversion.
+Both are built from source, following T.V. Raman's own instructions: the [Emacspeak manual's Quick Installation](https://tvraman.github.io/emacspeak/manual/Quick-Installation.html) and the [Emacspeak blog post "AsTeR: Spoken Math On The Emacspeak Audio Desktop" (2022-12-21)](https://emacspeak.blogspot.com/2022). The PKGBUILDs in `pkgbuilds/` script exactly these steps, so `[blinux]` ships prebuilt packages. The same steps are documented in the README for anyone building by hand.
+
+**Emacspeak** (`pkgbuilds/emacspeak/`, tracks the latest tag of `github.com/tvraman/emacspeak`):
+
+```sh
+git clone https://github.com/tvraman/emacspeak
+cd emacspeak
+make config
+make
+cd servers/native-espeak     # needs espeak-ng installed first
+make
+```
+
+- Install to `/usr/share/emacs/site-lisp/emacspeak/`.
+- `/etc/profile.d/emacspeak.sh` sets `export DTK_PROGRAM=espeak`, so Emacspeak uses the same eSpeak NG voice as Orca and espeakup.
+- Load it from a site-start file: `(load-file "/usr/share/emacs/site-lisp/emacspeak/lisp/emacspeak-setup.el")`. A `BLINUX_NO_EMACSPEAK=1` environment variable skips loading it.
+- Build deps: `emacs`, `espeak-ng`, `tcl` and `tclx` (the speech servers are Tcl scripts. Check `tclx` against the current server code, since it may be AUR-only).
+
+**AsTeR (aster-math)**: spoken math for LaTeX documents. Ships as an optional stack (see "Base and optional stacks"), because it pulls in a Lisp toolchain and a second synthesizer. The steps from Raman's post:
+
+1. **Prerequisites**
+   - Emacspeak **57.0 or later** (from GitHub, as above).
+   - `slime` and `auctex` in Emacs (Raman uses `M-x package-install`. Blinux installs them system-wide from Arch/AUR packages instead, so it works offline).
+   - `flex`, `sbcl` and `cl-asdf` from the package manager.
+   - **Software DECtalk** from `github.com/dectalk/dectalk`, built and installed, plus Emacspeak's `dtk-soft` server for it. AsTeR uses DECtalk for its voice and audio formatting, not eSpeak.
+2. **Build**, inside the Emacspeak directory:
+
+   ```sh
+   cd <emacspeak-dir>
+   git clone https://github.com/tvraman/aster-math
+   cd aster-math/lisp && make
+   ```
+
+3. **Use**: add `aster-math/ui/` to the Emacs `load-path` (the Blinux site-start file does this when the package is installed), then `M-x load-library RET aster`, `M-x aster`. Commands are on the `C-; SPC` and `C-' a` prefixes. `M-x describe-function RET aster` shows help.
+
+Packaging: `pkgbuilds/dectalk/` (Software DECtalk) and `pkgbuilds/aster-math/` (depends on `emacspeak>=57`, `dectalk`, `sbcl`, `flex`, `cl-asdf`, `slime`, `auctex`). AsTeR breaks the "one voice" principle on purpose. While reading math the user hears DECtalk, which is fine since that's the voice the rendering is designed for. For lighter math reading without AsTeR, Emacspeak's built-in Speech Rule Engine (SRE) math support ("poor man's AsTeR", per Raman) works with the default eSpeak voice. To enable it, package the `speech-rule-engine` Node module in the base stack.
+
+- Also in the documents stack: `texlive`, `pandoc`, `liblouis` (braille translation) and `brltty`.
 
 ### 11. Dotfiles integration
 
@@ -258,8 +290,8 @@ Ship these as **meta-packages** (`blinux-hep`, `blinux-ml`) so they can be insta
 3. Harvest and sort the package lists.
 4. Write `blinux-config` (including the audio and Wayland configs); verify Orca at GDM and in the session on a manual Arch install, and test the espeakup opt-in.
 5. Write `blinux-install` (Option A).
-6. Package Emacspeak; set up the speech server; test coding in Emacs.
-7. Look into Aster and maths speech; package what works.
+6. Package Emacspeak (Raman's `make config && make`, espeak server); test coding in Emacs.
+7. Package Software DECtalk and aster-math; test AsTeR on a LaTeX paper; enable SRE math in the base stack.
 8. Add the dotfiles hook.
 9. Add the HEP/ML meta-packages.
 10. Automated QEMU tests, then a full test with the screen off, then the first tagged release.
