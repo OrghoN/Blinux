@@ -10,14 +10,14 @@ The audio stack copies the author's working machine: **PulseAudio** is the sound
 
 | # | Milestone | Outcome |
 |---|-----------|---------|
-| 0 | Repo scaffolding | archiso profile skeleton, package lists, CI build, `yay` packaged in `[blinux]` |
+| 0 | Repo scaffolding | archiso profile skeleton, package lists, `ci.yml` (lint + unit + ISO build), `yay` packaged in `[blinux]` |
 | 1 | Talking live ISO | Boots with espeakup speech by default; can install vanilla Arch |
 | 2 | Accessible desktop | Installed system auto-starts GNOME (Wayland) + Orca at GDM and in the session; audio servers coexist without fighting over the device |
 | 3 | Shell and editor | zsh/oh-my-zsh default; Emacs + Emacspeak working with speech server |
 | 4 | Technical reading | AsTeR (aster-math + Software DECtalk) reading LaTeX math; SRE math in Emacspeak by default |
 | 5 | Dotfiles integration | Installer optionally clones and applies `OrghoN/.dotfiles` |
 | 6 | Optional stacks + drivers | `blinux-hep`, `blinux-ml`, `blinux-ml-cuda`, `blinux-aster`, `blinux-docs`; NVIDIA/CUDA as an install-time choice |
-| 7 | Release | Signed ISO, checksums, README with explanation + full command sequence, accessibility test pass |
+| 7 | Release | `release.yml` CD: signed repo + ISO, checksums, full automated suite on the release ISO, screen-off manual checklist, README with explanation + full command sequence |
 
 ---
 
@@ -29,7 +29,7 @@ The audio stack copies the author's working machine: **PulseAudio** is the sound
 2. **One voice where possible.** espeakup (console), Orca (GUI) and Emacspeak (Emacs) are three separate screen readers. Use the same synthesizer (eSpeak NG via speech-dispatcher) and the same default rate and voice, so the experience feels continuous.
 3. **Stay close to upstream Arch.** Blinux should be "Arch plus an accessible, opinionated default." Use official repos where possible, keep a small custom repo only for AUR-only packages (Emacspeak, some HEP tools), and avoid forking core components. That keeps maintenance manageable for one person.
 4. **Keyboard-first, terminal-friendly.** Users who rely on a screen reader tend to live in the terminal and in Emacs. GNOME stays the GUI fallback for browsers, office documents and similar apps, but the shell and editor experience is the core product.
-5. **Reproducible and declarative.** Keep the package lists, configs and dotfiles hook in git, and make the ISO build deterministic in CI.
+5. **Reproducible, declarative and tested.** Keep the package lists, configs and dotfiles hook in git, and make the ISO build deterministic in CI. Every accessibility promise ("it talks at boot", "Orca speaks at login") gets an automated test that listens for it.
 
 ### Who it's for
 
@@ -48,7 +48,7 @@ The audio stack copies the author's working machine: **PulseAudio** is the sound
 - **Audio contention.** espeakup (a root system service), speech-dispatcher, PulseAudio and PipeWire all touch the sound card. The author's machine runs them side by side. Blinux reproduces that exact setup (see "Audio and speech") instead of inventing a new one, but the GDM-to-session and TTY-to-desktop hand-offs still need testing on every release.
 - **Wayland gaps.** Blinux is Wayland-only: GNOME on Wayland, with XWayland for X11 apps, and no Xorg session. Orca on Wayland still has a few gaps (some global keyboard grabs and apps that are only half Wayland-native). Track them in Orca's issue tracker instead of shipping an X11 fallback.
 - **CUDA and proprietary drivers** can't be shipped freely in every configuration, so they're an install-time choice and never on the ISO (see "Hardware drivers and CUDA").
-- **ISO size.** The ISO only carries the base stack. ROOT, Geant4 data, PyTorch, CUDA, TeX Live and AsTeR's toolchain are optional stacks installed from the network (see "Base and optional stacks").
+- **ISO size.** GitHub Release assets max out at 2 GiB per file, so keep the ISO under that (or host it elsewhere). The ISO only carries the base stack. ROOT, Geant4 data, PyTorch, CUDA, TeX Live and AsTeR's toolchain are optional stacks installed from the network (see "Base and optional stacks").
 
 ---
 
@@ -100,7 +100,10 @@ blinux/
 │   ├── harvest-packages.sh    # derive lists from the author's machine
 │   ├── build-repo.sh
 │   └── build-iso.sh
-└── .github/workflows/build.yml
+└── .github/
+    ├── workflows/             # ci, testing-repo, nightly, upstream, release (see "GitHub Actions: CI/CD")
+    ├── dependabot.yml
+    └── pull_request_template.md
 ```
 
 ### 2. Seeding the package list from the current machine
@@ -326,15 +329,7 @@ These are the optional `blinux-hep`, `blinux-ml` and `blinux-ml-cuda` meta-packa
 - Sign packages with a dedicated GPG key, and generate the db with `repo-add -s blinux.db.tar.zst *.pkg.tar.zst`.
 - Host it on GitHub Releases or Pages and add it to `pacman.conf`, for both the ISO and installed systems.
 
-### 16. CI and builds
-
-- A GitHub Actions workflow running in an `archlinux:latest` container (needs `--privileged` for mkarchiso):
-  1. Build the `[blinux]` repo packages.
-  2. Run `mkarchiso`.
-  3. Upload the ISO + `sha256sums` + signature as an artifact or release.
-- Monthly scheduled rebuild to track Arch updates.
-
-### 17. Testing suite
+### 16. Testing suite
 
 Testing comes in six layers, from seconds-long checks on every commit to a release-time test with the screen off. Everything automated lives in `tests/` and runs locally through the `Makefile` with the same commands CI uses, so a failure in CI can always be reproduced on the author's machine.
 
@@ -431,6 +426,48 @@ The checklist in `tests/manual/release-checklist.md`, filled in per release and 
 - **README walk-through**: a screen-reader user follows the README from start to finish (build → USB → install → post-install) without sighted help.
 - Feedback from blind testers in the community (Arch accessibility list, Orca users list), filed as issues with a `tester-feedback` label.
 
+### 17. GitHub Actions: CI/CD
+
+CI runs the testing suite on every change. CD publishes packages to the `[blinux]` repos and produces signed ISO releases. Every job calls the same `make` targets as local runs, so nothing exists only in YAML.
+
+#### Workflows (`.github/workflows/`)
+
+| Workflow | Trigger | Jobs | Result |
+|----------|---------|------|--------|
+| `ci.yml` | every PR, every push to `main` | `lint` → `unit` → `packages` (only changed PKGBUILDs/lists, via a paths filter) → `iso` → `integration-smoke` (UEFI, `minimal` install, boot speech + STT) | required status checks for merging |
+| `testing-repo.yml` (CD) | push to `main` touching `pkgbuilds/` | build changed packages, sign, `repo-add`, publish to the rolling **`repo-testing`** release | `[blinux-testing]` repo for dogfooding on the author's machine |
+| `nightly.yml` | cron, daily 03:00 UTC, + manual `workflow_dispatch` | rebuild all packages against the latest Arch, full ISO, **full layer 4 matrix** (UEFI/BIOS × all install cases), layer 5 a11y tests | opens or updates a `nightly-failure` issue on failure, closes it on the next pass |
+| `upstream.yml` | cron, weekly | `nvchecker` against Emacspeak, aster-math, Software DECtalk, yay and oh-my-zsh; opens a version-bump PR (pkgver + `.SRCINFO`) for each update | bumps go through `ci.yml` like any other change |
+| `release.yml` (CD) | tag `v*` | build and sign all packages → publish to the rolling **`repo`** release (stable `[blinux]`) → build the ISO from that repo → run the full layer 4 + 5 suite against **that exact ISO** → GPG-sign the ISO, write `sha256sums` + `b2sums` → create a **draft** GitHub Release with notes and the layer 6 checklist attached | the maintainer publishes the draft once the manual screen-off checklist passes |
+
+#### How the jobs run
+
+- **Arch on Ubuntu runners**: jobs use the `archlinux:base-devel` container. `mkarchiso` and clean-chroot builds need `docker run --privileged`, so those steps run with `docker run` directly instead of `container:`.
+- **KVM for QEMU**: GitHub-hosted Ubuntu runners expose `/dev/kvm`. Make it accessible with a udev rule step (`KERNEL=="kvm", GROUP="kvm", MODE="0666"`). The integration jobs fail fast if KVM is missing instead of crawling along under TCG.
+- **Disk and time limits**: the ISO build needs more than a runner's default free disk, so the first step removes preinstalled SDKs (Android, .NET, Haskell). Integration jobs are split across a matrix to stay well under the 6-hour job limit.
+- **Caching** (`actions/cache`): the pacman package cache (keyed on a hash of `packages/*.txt` + the week), the makepkg `SRCDEST` source cache, and the offline speech-to-text model.
+- **Artifacts**: the ISO from `ci.yml` is kept for 3 days so it can be downloaded and tried from a PR. Failure artifacts (serial logs, WAVs, screenshots, journals) are kept for 14 days.
+- **Concurrency**: `concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true` for PRs. Release and nightly runs are never cancelled.
+
+#### Package repos and hosting
+
+- **Stable `[blinux]`**: assets on a rolling GitHub Release named `repo`, updated only by `release.yml`. In `pacman.conf`: `Server = https://github.com/OrghoN/Blinux/releases/download/repo`.
+- **`[blinux-testing]`**: the same layout on a `repo-testing` release, updated on every merge to `main`. It's off by default, and opt-in on dev machines.
+- Every package and both databases are signed (`repo-add -s -v`). `blinux-config` ships the public key in a keyring package (`blinux-keyring`), so installed systems trust it through `pacman-key` without manual steps.
+
+#### Security and hygiene
+
+- The default `permissions: contents: read`. Only the CD jobs get `contents: write`.
+- The signing key (`BLINUX_GPG_PRIVATE_KEY`, `BLINUX_GPG_PASSPHRASE`) lives in a GitHub **environment** called `release`, protected by a required reviewer, so only approved tag builds can sign. `repo-testing` uses a separate testing subkey.
+- Third-party actions are pinned to commit SHAs. Dependabot (`github-actions` ecosystem) keeps them updated.
+- Branch protection on `main`: PRs need `lint`, `unit`, `packages`, `iso` and `integration-smoke` to pass. No direct pushes once CI exists.
+- The PR template includes a checklist item: "README command sequence updated if scripts or commands changed".
+
+#### Running CI locally
+
+- `make lint unit packages iso test-iso test-a11y` runs the same steps. `make ci` runs the PR subset in the same container image.
+- `act` can dry-run workflow changes before pushing.
+
 ### 18. README: explanation and setup commands
 
 The README is the entry point. A blind user will read it with a screen reader before they have a working Blinux, so it has to stand on its own. As each piece of the plan lands, **the README must be updated** with a plain-language explanation and the exact sequence of commands to run, in order. Use plain text and fenced code blocks, with no images, badges-only info or tables that are required to follow along. Sections to add:
@@ -455,13 +492,15 @@ The README is the entry point. A blind user will read it with a screen reader be
    git clone https://github.com/OrghoN/.dotfiles ~/.dotfiles   # then that repo's bootstrap
    ```
 6. **Building Emacspeak and AsTeR by hand**: Raman's command sequences from "Emacs, Emacspeak and AsTeR", with links to the manual and blog post, for people who aren't on Blinux.
-7. **Troubleshooting audio**: `pactl info`, `systemctl --user status pulseaudio speech-dispatcher`, `systemctl status espeakup`, `alsamixer` unmute, and how to tell PipeWire's video role apart from PulseAudio's audio role.
+7. **Running the tests**: `make lint`, `make unit`, `make test-iso`, etc., what each layer covers, and how to grab CI artifacts (WAVs, serial logs) when a test fails.
+8. **Releases and repos**: where ISOs and checksums are, how to verify the signature (`gpg --verify`), and how to enable `[blinux-testing]`.
+9. **Troubleshooting audio**: `pactl info`, `systemctl --user status pulseaudio speech-dispatcher`, `systemctl status espeakup`, `alsamixer` unmute, and how to tell PipeWire's video role apart from PulseAudio's audio role.
 
 Write the commands only once the scripts exist, and keep them in sync. Each PR that adds or changes a script must update the README's command sequence (add a checklist item to the PR template). The release gate (milestone 7) includes a check that a screen-reader user can follow the README from start to finish.
 
 ### 19. Suggested order of work
 
-1. Scaffold the repo, copy `releng`, build an unmodified ISO in CI. Set up the `[blinux]` repo with `yay` as its first package and add it to the ISO.
+1. Scaffold the repo, the `Makefile` and `ci.yml` (lint + unit + ISO build), and copy `releng` to build an unmodified ISO in CI. Set up the `[blinux]` repo with `yay` as its first package, publish it through `testing-repo.yml`, and add it to the ISO. Turn on branch protection.
 2. Make speech the default boot entry; verify in QEMU.
 3. Harvest and sort the package lists.
 4. Write `blinux-config` (including the audio and Wayland configs); verify Orca at GDM and in the session on a manual Arch install, and test the espeakup opt-in.
@@ -471,6 +510,7 @@ Write the commands only once the scripts exist, and keep them in sync. Each PR t
 8. Add the dotfiles hook.
 9. Add the `blinux-base` and optional meta-packages, the driver/CUDA installer step and `blinux-drivers`.
 10. Grow the testing suite alongside steps 1–9 (layers 1–2 from step 1, layer 3 from step 6, layer 4 from step 5), then add the layer 5 accessibility tests and run the layer 6 test with the screen off.
-11. Update the README with the explanation and the full command sequence (build → USB → install → post-install → troubleshooting). Follow it with only a screen reader to check it, then make the first tagged release.
+11. Add `nightly.yml`, `upstream.yml` and `release.yml`, then set up the `release` environment and signing keys.
+12. Update the README with the explanation and the full command sequence (build → USB → install → post-install → troubleshooting → running tests). Follow it with only a screen reader to check it, then tag `v0.1.0`. `release.yml` builds and tests the draft release, and it's published after the manual checklist passes.
 
 Throughout: every step above that adds a script or user-facing command also updates the README in the same commit.
