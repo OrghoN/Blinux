@@ -1,0 +1,73 @@
+# Maintainer: OrghoN <https://github.com/OrghoN>
+#
+# Emacspeak, built the way T.V. Raman's manual describes
+# (https://tvraman.github.io/emacspeak/manual/Quick-Installation.html):
+#
+#   make config && make
+#   cd servers/native-espeak && make
+#
+# and installed as a whole tree in /opt/emacspeak, the layout Raman uses and
+# the one the author's dotfiles load from:
+#
+#   (load-file "/opt/emacspeak/lisp/emacspeak-setup.el")
+#
+# AsTeR (the aster-math package) installs into /opt/emacspeak/aster-math, as in
+# Raman's AsTeR blog post. DTK_PROGRAM=espeak is set in /etc/profile.d, so
+# Emacspeak uses the same eSpeak NG voice as Orca and espeakup.
+
+pkgname=emacspeak
+pkgver=60.0
+pkgrel=1
+pkgdesc="The complete audio desktop: spoken output for Emacs (T.V. Raman), with the espeak server"
+arch=('x86_64')
+url="https://github.com/tvraman/emacspeak"
+license=('GPL-2.0-or-later')
+depends=('emacs' 'tcl' 'tclx' 'espeak-ng' 'sox')
+optdepends=('dectalk: Software DECtalk voice (dtk-soft server), used by AsTeR'
+            'python: some Emacspeak utilities'
+            'perl: some Emacspeak utilities')
+source=("https://github.com/tvraman/emacspeak/releases/download/${pkgver}/emacspeak-${pkgver}.tar.bz2"
+        "emacspeak.sh"
+        "50-emacspeak.el")
+sha512sums=('f48040f2dfaf7cb67d779d219c59477aaddb9c8b400666e5e9d9850e75575d5276f5b596ab1e8976057e5078d914a610cd537068ccc748e6c45aef64b02eaba9'
+            'SKIP'
+            'SKIP')
+
+build() {
+  cd "emacspeak-${pkgver}"
+  export DTK_PROGRAM=espeak
+  make config
+  make
+  cd servers/native-espeak
+  make TCL_INCLUDE=/usr/include
+}
+
+check() {
+  cd "emacspeak-${pkgver}"
+  # The eSpeak server module loads into Tcl (and initialises eSpeak NG).
+  echo 'load servers/native-espeak/tclespeak.so; exit' | tclsh
+  # The setup file Raman's instructions load must bring up Emacspeak.
+  emacs --batch -Q --eval '(progn
+      (setq dtk-program "espeak" emacspeak-play-emacspeak-startup-icon nil)
+      (load-file "lisp/emacspeak-setup.el")
+      (unless (featurep (quote emacspeak)) (kill-emacs 1)))'
+}
+
+package() {
+  cd "emacspeak-${pkgver}"
+  install -d "$pkgdir/opt/emacspeak"
+  # The whole tree, as Raman's instructions use it. aster-math is an empty
+  # git submodule in the release; the aster-math package provides it.
+  cp -a --no-preserve=ownership . "$pkgdir/opt/emacspeak/"
+  rm -rf "$pkgdir/opt/emacspeak/aster-math" "$pkgdir/opt/emacspeak/.git"* \
+    "$pkgdir/opt/emacspeak/FETCH_HEAD"
+  find "$pkgdir/opt/emacspeak" -name '*.o' -delete
+  # emacspeak-preamble.elc bakes in build-time paths (the XSL directory).
+  # Without the .elc, Emacs loads the .el and computes them from /opt/emacspeak.
+  rm -f "$pkgdir/opt/emacspeak/lisp/emacspeak-preamble.elc"
+
+  install -Dm644 "$srcdir/emacspeak.sh" "$pkgdir/etc/profile.d/emacspeak.sh"
+  install -Dm644 "$srcdir/50-emacspeak.el" \
+    "$pkgdir/usr/share/emacs/site-lisp/site-start.d/50-emacspeak.el"
+  install -Dm644 README "$pkgdir/usr/share/doc/emacspeak/README"
+}

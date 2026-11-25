@@ -1,0 +1,23 @@
+pkgbase = emacspeak
+	pkgdesc = The complete audio desktop: spoken output for Emacs (T.V. Raman), with the espeak server
+	pkgver = 60.0
+	pkgrel = 1
+	url = https://github.com/tvraman/emacspeak
+	arch = x86_64
+	license = GPL-2.0-or-later
+	depends = emacs
+	depends = tcl
+	depends = tclx
+	depends = espeak-ng
+	depends = sox
+	optdepends = dectalk: Software DECtalk voice (dtk-soft server), used by AsTeR
+	optdepends = python: some Emacspeak utilities
+	optdepends = perl: some Emacspeak utilities
+	source = https://github.com/tvraman/emacspeak/releases/download/60.0/emacspeak-60.0.tar.bz2
+	source = emacspeak.sh
+	source = 50-emacspeak.el
+	sha512sums = f48040f2dfaf7cb67d779d219c59477aaddb9c8b400666e5e9d9850e75575d5276f5b596ab1e8976057e5078d914a610cd537068ccc748e6c45aef64b02eaba9
+	sha512sums = SKIP
+	sha512sums = SKIP
+
+pkgname = emacspeak
