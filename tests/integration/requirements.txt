@@ -1,0 +1,5 @@
+# Layer 4/5 harness (make test-iso / make test-a11y). The host also needs:
+# qemu-system-x86_64, qemu-img, OVMF, xorriso, git.
+pytest==8.3.4
+pexpect==4.9.0
+vosk==0.3.45

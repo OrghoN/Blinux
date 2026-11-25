@@ -13,3 +13,5 @@
 __pycache__/
 .venv/
 .pytest_cache/
+# test artifacts (WAVs, serial logs, disk images)
+/tests/integration/artifacts/
