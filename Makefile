@@ -25,6 +25,7 @@ SUDO       ?= sudo
 ISO        ?= $(firstword $(wildcard out/blinux-*.iso))
 CASES      ?=
 FIRMWARE   ?=
+PYTEST_ARGS ?=
 
 SHELL_FILES := $(shell git ls-files 'scripts/*.sh' 'tools/bin/*' 'tools/lib/*.sh' \
 	'tests/static/*.sh' 'tests/packages/*.sh' 'config/usr/lib/blinux/*.sh' 2>/dev/null)
@@ -81,11 +82,11 @@ iso:
 	$(SUDO) scripts/build-iso.sh
 
 test-iso:
-	$(PYTEST) tests/integration -m "not a11y" --iso "$(ISO)" \
+	$(PYTEST) tests/integration -m "not a11y" --iso "$(ISO)" $(PYTEST_ARGS) \
 		$(if $(CASES),--cases "$(CASES)") $(if $(FIRMWARE),--firmware "$(FIRMWARE)")
 
 test-a11y:
-	$(PYTEST) tests/integration tests/a11y -m a11y --iso "$(ISO)"
+	$(PYTEST) tests/a11y -m a11y --iso "$(ISO)" $(PYTEST_ARGS)
 
 # ---------------------------------------------------------------- shortcuts
 test: lint unit

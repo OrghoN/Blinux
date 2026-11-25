@@ -1,0 +1,9 @@
+# Upstream versions watched by scripts/bump-upstream.sh (upstream.yml).
+# aster-math and dectalk are pinned to commits and checked with git ls-remote.
+[__config__]
+oldver = ""
+
+[emacspeak]
+source = "github"
+github = "tvraman/emacspeak"
+use_latest_release = true

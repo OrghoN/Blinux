@@ -125,6 +125,9 @@ stage_local() {
         blinux-config)
             cp -a "$ROOT/config" "$dest/files"
             ;;
+        blinux-keyring)
+            cp -a "$ROOT/keys" "$dest/files"
+            ;;
     esac
     echo "$dest"
 }
@@ -214,6 +217,10 @@ main() {
     while read -r pkg; do
         [[ -z "$pkg" || "$pkg" == \#* ]] && continue
         wanted "$pkg" || continue
+        if [[ "$pkg" == blinux-keyring && ! -f "$ROOT/keys/blinux.asc" ]]; then
+            log "Skipping blinux-keyring: keys/blinux.asc doesn't exist yet (see keys/README.md)"
+            continue
+        fi
         if [[ "$MODE" == nodeps ]] && [[ "$pkg" != blinux-* ]]; then
             log "nodeps mode: skipping $pkg (has real build dependencies)"
             continue

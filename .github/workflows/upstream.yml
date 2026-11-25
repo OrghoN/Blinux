@@ -1,0 +1,45 @@
+# Weekly: look for new Emacspeak releases, new aster-math and Software DECtalk
+# commits, and new AUR package versions, and open one pull request with the
+# bumps. The pull request then goes through ci.yml like any other change.
+name: upstream
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Install tools
+        run: pacman -Syu --noconfirm --needed git nvchecker pacman-contrib jq python
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Check upstream versions
+        id: bump
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # makepkg (updpkgsums) refuses to run as root.
+          useradd -m builder && chown -R builder .
+          runuser -u builder -- env GITHUB_TOKEN="$GITHUB_TOKEN" scripts/bump-upstream.sh | tee summary.md
+          chown -R root .
+      - uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
+        with:
+          branch: upstream-bumps
+          delete-branch: true
+          commit-message: "Bump upstream versions"
+          title: "Bump upstream versions"
+          body-path: summary.md
+          add-paths: |
+            pkgbuilds/**
+            packages/aur.lock
+          labels: upstream

@@ -1,0 +1,10 @@
+pkgbase = blinux-keyring
+	pkgdesc = Blinux package signing key for pacman
+	pkgver = 1
+	pkgrel = 1
+	url = https://github.com/OrghoN/Blinux
+	install = blinux-keyring.install
+	arch = any
+	license = GPL-3.0-or-later
+
+pkgname = blinux-keyring

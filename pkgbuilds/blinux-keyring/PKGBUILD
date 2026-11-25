@@ -1,0 +1,23 @@
+# Maintainer: OrghoN <https://github.com/OrghoN>
+#
+# The [blinux] package signing key, installed the way archlinux-keyring is, so
+# pacman trusts Blinux packages with no manual pacman-key steps. build-repo.sh
+# stages keys/ into files/ before building, and skips this package until
+# keys/blinux.asc exists (see keys/README.md).
+
+pkgname=blinux-keyring
+pkgver=1
+pkgrel=1
+pkgdesc="Blinux package signing key for pacman"
+arch=('any')
+url="https://github.com/OrghoN/Blinux"
+license=('GPL-3.0-or-later')
+install=blinux-keyring.install
+source=()
+
+package() {
+  local keys="$startdir/files"
+  [[ -f "$keys/blinux.asc" ]] || { echo "keys/blinux.asc is missing (see keys/README.md)" >&2; return 1; }
+  install -Dm644 "$keys/blinux.asc" "$pkgdir/usr/share/pacman/keyrings/blinux.gpg"
+  install -Dm644 "$keys/blinux-trusted" "$pkgdir/usr/share/pacman/keyrings/blinux-trusted"
+}
