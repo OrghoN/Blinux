@@ -1,0 +1,2 @@
+{"disk": "/dev/vda", "firmware": "uefi", "username": "tester", "password": "blinux-test",
+ "hostname": "blinux-cuda", "microcode": "amd", "graphics": "nvidia-cuda", "stacks": ["ml"]}

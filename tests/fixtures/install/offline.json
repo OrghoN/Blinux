@@ -1,0 +1,2 @@
+{"disk": "/dev/vda", "firmware": "uefi", "username": "tester", "password": "blinux-test",
+ "hostname": "blinux-offline", "microcode": "none", "graphics": "nvidia", "stacks": ["hep"]}

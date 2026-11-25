@@ -118,7 +118,7 @@ partition_disk() {
         ROOT_PART="$(partition_path "$disk" 3)"
     fi
     quiet partprobe "$disk"
-    run udevadm settle
+    runcmd udevadm settle
 }
 
 format_and_mount() {
@@ -129,8 +129,8 @@ format_and_mount() {
         local pass
         pass="$(cfg .passphrase)"
         if [[ "$DRY_RUN" == 1 ]]; then
-            run cryptsetup luksFormat --type luks2 --batch-mode --key-file=- "$ROOT_PART"
-            run cryptsetup open --key-file=- "$ROOT_PART" blinuxroot
+            runcmd cryptsetup luksFormat --type luks2 --batch-mode --key-file=- "$ROOT_PART"
+            runcmd cryptsetup open --key-file=- "$ROOT_PART" blinuxroot
         else
             # Not through quiet(): background jobs get /dev/null as stdin, and
             # the passphrase has to reach cryptsetup on stdin.
@@ -148,8 +148,8 @@ format_and_mount() {
     else
         quiet mkfs.ext4 -F -L boot "$BOOT_PART"
     fi
-    run mount "$ROOT_DEV" "$MNT"
-    run mount --mkdir "$BOOT_PART" "$MNT/boot"
+    runcmd mount "$ROOT_DEV" "$MNT"
+    runcmd mount --mkdir "$BOOT_PART" "$MNT/boot"
 }
 
 write_pacman_confs() {
@@ -235,7 +235,7 @@ create_user() {
     step "creating the user $user, with zsh as the shell."
     in_target useradd -m -G wheel -s /usr/bin/zsh "$user"
     if [[ "$DRY_RUN" == 1 ]]; then
-        run arch-chroot "$MNT" chpasswd
+        runcmd arch-chroot "$MNT" chpasswd
     else
         printf '%s:%s\n' "$user" "$(cfg .password)" | arch-chroot "$MNT" chpasswd
     fi
@@ -321,7 +321,7 @@ finish_system() {
     in_target systemctl enable gdm.service NetworkManager.service bluetooth.service
     if [[ "$(cfg .console_speech false)" == true ]]; then
         say "Turning on console speech."
-        run blinux-console-speech enable --root "$MNT"
+        runcmd blinux-console-speech enable --root "$MNT"
     fi
     # Carry the live system's unmuted mixer levels over, so the first boot is never silent.
     if [[ "$DRY_RUN" != 1 ]]; then
@@ -344,15 +344,15 @@ setup_dotfiles() {
         say "There is no network, so the dotfiles weren't cloned. Run blinux-dotfiles after the first boot."
         return 0
     fi
-    run blinux-dotfiles --root "$MNT" --user "$(cfg .username)" --url "$(cfg .dotfiles.url https://github.com/OrghoN/.dotfiles)"
+    runcmd blinux-dotfiles --root "$MNT" --user "$(cfg .username)" --url "$(cfg .dotfiles.url https://github.com/OrghoN/.dotfiles)"
 }
 
 unmount_all() {
     step "finishing up."
-    run sync
-    run umount -R "$MNT"
+    runcmd sync
+    runcmd umount -R "$MNT"
     if [[ "$(cfg .encrypt false)" == true ]]; then
-        run cryptsetup close blinuxroot
+        runcmd cryptsetup close blinuxroot
     fi
 }
 

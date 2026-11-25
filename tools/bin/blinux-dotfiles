@@ -134,11 +134,11 @@ fi
 self_args=(--as-user --url "$URL" --dir "$DIR")
 
 if [[ "$ROOT" != / ]]; then
-    run arch-chroot "$ROOT" runuser -l "$TARGET_USER" -c "blinux-dotfiles $(printf '%q ' "${self_args[@]}")"
+    runcmd arch-chroot "$ROOT" runuser -l "$TARGET_USER" -c "blinux-dotfiles $(printf '%q ' "${self_args[@]}")"
 elif [[ "$(id -un)" == "$TARGET_USER" ]]; then
-    run "$0" "${self_args[@]}"
+    runcmd "$0" "${self_args[@]}"
 elif [[ $EUID -eq 0 ]]; then
-    run runuser -l "$TARGET_USER" -c "$(printf '%q ' "$0" "${self_args[@]}")"
+    runcmd runuser -l "$TARGET_USER" -c "$(printf '%q ' "$0" "${self_args[@]}")"
 else
     die "Run this as $TARGET_USER, or with sudo."
 fi

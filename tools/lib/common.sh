@@ -40,8 +40,8 @@ rootpath() {
     printf '%s%s\n' "$root" "$1"
 }
 
-# run CMD...: run a command, or print it in dry-run mode. Always logged.
-run() {
+# runcmd CMD...: run a command, or print it in dry-run mode. Always logged.
+runcmd() {
     {
         printf '+'
         printf ' %q' "$@"

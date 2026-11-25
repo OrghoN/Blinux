@@ -78,7 +78,7 @@ if [[ "$DRY_RUN" != 1 && $EUID -ne 0 && ! -w "$(rootpath /etc)" ]]; then
 fi
 
 pacman_() {
-    if [[ "$ROOT" == / ]]; then run pacman "$@"; else run pacman --root "$ROOT" "$@"; fi
+    if [[ "$ROOT" == / ]]; then runcmd pacman "$@"; else runcmd pacman --root "$ROOT" "$@"; fi
 }
 
 if ((PACKAGES)); then

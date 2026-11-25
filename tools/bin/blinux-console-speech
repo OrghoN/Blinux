@@ -49,9 +49,9 @@ share="${BLINUX_SHARE:-$(rootpath /usr/share/blinux)}"
 systemctl_() {
     ((USE_SYSTEMCTL)) || return 0
     if [[ "$ROOT" == / ]]; then
-        run systemctl "$@"
+        runcmd systemctl "$@"
     else
-        run systemctl --root="$ROOT" "$@"
+        runcmd systemctl --root="$ROOT" "$@"
     fi
 }
 

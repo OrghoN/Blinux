@@ -51,12 +51,12 @@ cmdline_add() {
     shopt -s nullglob
     for entry in "$(rootpath "$SDBOOT_ENTRIES")"/blinux*.conf; do
         grep -Eq "^options.*(^| )${param}( |$)" "$entry" && continue
-        run sed -i "s|^options .*|& ${param}|" "$entry"
+        runcmd sed -i "s|^options .*|& ${param}|" "$entry"
     done
     shopt -u nullglob
     grub="$(rootpath "$GRUB_DEFAULTS")"
     if [[ -f "$grub" ]] && ! grep -Eq "^GRUB_CMDLINE_LINUX_DEFAULT=.*${param}" "$grub"; then
-        run sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=\"\\(.*\\)\"|GRUB_CMDLINE_LINUX_DEFAULT=\"\\1 ${param}\"|" "$grub"
+        runcmd sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=\"\\(.*\\)\"|GRUB_CMDLINE_LINUX_DEFAULT=\"\\1 ${param}\"|" "$grub"
         GRUB_CHANGED=1
     fi
 }
@@ -65,12 +65,12 @@ cmdline_remove() {
     local param="$1" entry grub
     shopt -s nullglob
     for entry in "$(rootpath "$SDBOOT_ENTRIES")"/blinux*.conf; do
-        run sed -i "s| ${param}||g" "$entry"
+        runcmd sed -i "s| ${param}||g" "$entry"
     done
     shopt -u nullglob
     grub="$(rootpath "$GRUB_DEFAULTS")"
     if [[ -f "$grub" ]] && grep -q "${param}" "$grub"; then
-        run sed -i "s| ${param}||g" "$grub"
+        runcmd sed -i "s| ${param}||g" "$grub"
         GRUB_CHANGED=1
     fi
 }
@@ -78,9 +78,9 @@ cmdline_remove() {
 # chroot_run CMD...: run CMD in $ROOT (arch-chroot), or directly when ROOT=/.
 chroot_run() {
     if [[ "$ROOT" == / ]]; then
-        run "$@"
+        runcmd "$@"
     else
-        run arch-chroot "$ROOT" "$@"
+        runcmd arch-chroot "$ROOT" "$@"
     fi
 }
 

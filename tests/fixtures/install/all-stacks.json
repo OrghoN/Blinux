@@ -1,0 +1,4 @@
+{"disk": "/dev/vda", "firmware": "uefi", "username": "tester", "password": "blinux-test",
+ "hostname": "blinux-full", "microcode": "intel", "graphics": "open",
+ "stacks": ["aster", "docs", "hep", "ml"],
+ "dotfiles": {"enabled": true, "url": "http://10.0.2.2:8000/dotfiles.git"}}

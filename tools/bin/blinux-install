@@ -222,7 +222,7 @@ fi
 install_system
 
 if [[ "$(cfg .reboot false)" == true ]]; then
-    run systemctl reboot
+    runcmd systemctl reboot
 else
     say "Remove the install medium, then type reboot and press Enter."
 fi
