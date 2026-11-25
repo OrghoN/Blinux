@@ -36,12 +36,10 @@ declare -A CHECK=(
             (load-file \"/opt/emacspeak/lisp/emacspeak-setup.el\")
             (unless (featurep (quote emacspeak)) (kill-emacs 1)))" &&
         (cd /opt/emacspeak/js/node && node -e "require(\"speech-rule-engine\"); require(\"mathjax\")")'
-    [dectalk]='say -fo /tmp/dectalk.wav "Blinux test" && test -s /tmp/dectalk.wav'
     [aster-math]='test -x /opt/emacspeak/aster-math/lisp/lexer/lispify &&
         printf "\$x^2\$" | /opt/emacspeak/aster-math/lisp/lexer/lispify | grep -q inline-math &&
-        test -f /opt/emacspeak/servers/software-dtk/tcldtk.so &&
         emacs --batch -Q -L /opt/emacspeak/aster-math/ui --eval "(locate-library \"aster\")"'
-    [blinux-hep]='root -b -q -e "gROOT->GetVersion()" && python -c "import uproot, awkward, hist"'
+    [blinux-hep]='root -b -q -e "gROOT->GetVersion()" && python -c "import ROOT"'
     [blinux-ml]='python -c "import torch, sklearn, pandas; torch.zeros(1)"'
 )
 HEAVY=(blinux-hep blinux-ml)
@@ -49,7 +47,8 @@ HEAVY=(blinux-hep blinux-ml)
 if (($#)); then
     targets=("$@")
 else
-    targets=(yay blinux-tools blinux-config emacspeak dectalk aster-math)
+    # DECtalk is proprietary and never built by Blinux CI (blinux-aster-setup).
+    targets=(yay blinux-tools blinux-config emacspeak aster-math)
     [[ "${SMOKE_HEAVY:-0}" == 1 ]] && targets+=("${HEAVY[@]}")
 fi
 

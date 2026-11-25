@@ -36,8 +36,11 @@ def strip_version(dep: str) -> str:
 def in_official_repos(name: str) -> bool:
     """True if pacman's sync databases can satisfy NAME (including provides)."""
     if name not in _official_cache:
+        # -dd: resolve the name (and "provides") without computing a whole
+        # transaction against the local system, which fails on unrelated
+        # conflicts when the host is mid-upgrade.
         result = subprocess.run(
-            ["pacman", "-Sp", "--print-format", "%n", name],
+            ["pacman", "-Sp", "-dd", "--print-format", "%n", name],
             capture_output=True,
             text=True,
         )
@@ -100,7 +103,9 @@ def resolve(roots: list[str], local: set[str]) -> tuple[list[str], dict[str, dic
             for prov in info.get("Provides", []) or []:
                 by_name[strip_version(prov)] = info
             bases[info["PackageBase"]] = info
-            for field in ("Depends", "MakeDepends", "CheckDepends"):
+            # CheckDepends are left out: AUR packages are built with --nocheck,
+            # because their test suites pull in dependency cycles and huge extras.
+            for field in ("Depends", "MakeDepends"):
                 pending.extend(strip_version(d) for d in info.get(field, []) or [])
 
     if missing:
@@ -117,7 +122,7 @@ def resolve(roots: list[str], local: set[str]) -> tuple[list[str], dict[str, dic
             raise SystemExit(f"dependency cycle involving {base}")
         state[base] = 1
         info = bases[base]
-        for field in ("Depends", "MakeDepends", "CheckDepends"):
+        for field in ("Depends", "MakeDepends"):
             for dep in info.get(field, []) or []:
                 dep_info = by_name.get(strip_version(dep))
                 if dep_info and dep_info["PackageBase"] != base:

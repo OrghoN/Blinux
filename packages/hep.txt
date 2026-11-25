@@ -6,12 +6,13 @@ hepmc
 fastjet
 fastjet-contrib
 lhapdf
-python-uproot
-python-awkward
-python-hist
 apptainer
 gcc-fortran
 boost
 eigen
 gsl
-# Not packaged: delphes (install from source or in an apptainer image).
+# Not here:
+# - uproot, awkward, hist (scikit-hep): their AUR packages are stale and
+#   awkward's needs the CUDA toolkit to build. Install the PyPI wheels per
+#   project instead: uv pip install uproot awkward hist
+# - delphes: not packaged; build from source or use an apptainer image.

@@ -19,6 +19,7 @@ package() {
   [[ -d "$files/tools" ]] || { echo "files/ not staged: run scripts/build-repo.sh" >&2; return 1; }
   install -Dm755 -t "$pkgdir/usr/bin" "$files"/tools/bin/*
   install -Dm644 -t "$pkgdir/usr/lib/blinux" "$files"/tools/lib/*.sh
-  install -Dm644 -t "$pkgdir/usr/share/blinux" "$files"/tools/share/*
+  install -d "$pkgdir/usr/share/blinux"
+  cp -a --no-preserve=ownership "$files"/tools/share/. "$pkgdir/usr/share/blinux/"
   install -Dm644 -t "$pkgdir/usr/share/blinux/packages" "$files"/packages/*.txt
 }

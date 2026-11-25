@@ -146,7 +146,6 @@ package_blinux-aster() {
     'aster-math'
     'auctex'
     'cl-asdf-flv'
-    'dectalk'
     'emacs-slime'
     'flex'
     'sbcl'
@@ -186,9 +185,6 @@ package_blinux-hep() {
     'hepmc'
     'lhapdf'
     'pythia8'
-    'python-awkward'
-    'python-hist'
-    'python-uproot'
     'root'
   )
 }

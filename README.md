@@ -24,7 +24,7 @@ Blinux talks from the moment it boots, and nothing on the way to a working deskt
 - **Audio:** PulseAudio is the sound server. PipeWire runs alongside it only for screen capture and video. `pipewire-pulse` is never installed, so the two never fight over the sound card. Orca speaks through speech-dispatcher, which uses eSpeak NG and PulseAudio.
 - **Console speech after install:** off by default, as on the author's machine. One command turns it on, and then espeakup speaks on the text consoles through your PulseAudio.
 - **Editor:** Emacs with Emacspeak in `/opt/emacspeak`, using the same eSpeak NG voice. Emacspeak's math server (MathJax with the Speech Rule Engine) reads LaTeX formulas.
-- **AsTeR:** spoken math for whole LaTeX documents, in `/opt/emacspeak/aster-math`, speaking with Software DECtalk. It's an optional stack.
+- **AsTeR:** spoken math for whole LaTeX documents, in `/opt/emacspeak/aster-math`, speaking with Software DECtalk. It's an optional stack. DECtalk itself is proprietary, so Blinux doesn't distribute it: `blinux-aster-setup` builds it on your own computer if you're entitled to use it.
 - **Shell and packages:** zsh with oh-my-zsh and a plain prompt that reads cleanly. yay is ready to use for AUR packages.
 - **Dotfiles:** the installer can clone a dotfiles repository and link it into place, the way `OrghoN/.dotfiles` expects.
 
@@ -32,9 +32,9 @@ What gets installed comes in two layers.
 
 - **Base stack:** always installed, and carried on the ISO so it installs without a network. It covers the system, audio and speech, GNOME, zsh, Emacs with Emacspeak, yay and core development tools.
 - **Optional stacks:** chosen in the installer, and installable at any time later:
-  - `blinux-aster`: AsTeR spoken math, with Software DECtalk
+  - `blinux-aster`: AsTeR spoken math (its DECtalk voice is built locally by `blinux-aster-setup`)
   - `blinux-docs`: TeX Live, pandoc and liblouis braille translation
-  - `blinux-hep`: ROOT, Geant4, Pythia8, FastJet, LHAPDF, scikit-hep
+  - `blinux-hep`: ROOT, Geant4, Pythia8, FastJet, HepMC3, LHAPDF and Apptainer. For uproot, awkward and hist, use `uv pip install uproot awkward hist` in each project
   - `blinux-ml`: PyTorch, scikit-learn, pandas, Jupyter
   - `blinux-ml-cuda`: the same with GPU PyTorch
 - **Graphics drivers:** an install-time choice. Open source drivers are the default; NVIDIA proprietary, or NVIDIA with CUDA, are downloaded during installation. They're never on the ISO.
@@ -116,10 +116,12 @@ sudo blinux-console-speech enable
 sudo blinux-drivers
 sudo pacman -S blinux-hep blinux-ml
 sudo pacman -S blinux-aster blinux-docs
+blinux-aster-setup
 blinux-dotfiles --url https://github.com/OrghoN/.dotfiles
 ```
 
 - `blinux-console-speech enable` turns on espeakup on the text consoles. `disable` turns it off and `status` tells you which it is.
+- `blinux-aster-setup` builds AsTeR's DECtalk voice on your computer, after explaining DECtalk's licence and asking first.
 - `blinux-drivers` switches between open source, NVIDIA and NVIDIA with CUDA graphics, without reinstalling.
 - `blinux-dotfiles` clones the repository into `~/.dotfiles` and links it into place, moving any file it replaces aside as `NAME.blinux-backup`.
 - yay works straight away, for example `yay -S some-aur-package`.
@@ -128,7 +130,14 @@ blinux-dotfiles --url https://github.com/OrghoN/.dotfiles
 
 Emacspeak starts with Emacs for every user. If your own `init.el` already loads `emacspeak-setup.el`, as `OrghoN/.dotfiles` does, it isn't loaded twice. To start Emacs without Emacspeak, set `BLINUX_NO_EMACSPEAK=1`.
 
-To use AsTeR, install the `blinux-aster` stack, then in Emacs run `M-x load-library RET aster` followed by `M-x aster`. Its commands are on the `C-; SPC` and `C-' a` prefixes, and `M-x describe-function RET aster` shows its help.
+To use AsTeR, install the `blinux-aster` stack, then give it its voice. Software DECtalk is proprietary: its licence allows use and copying only with a licence from Fonix, so Blinux never builds or distributes it. If you're entitled to use it, this builds DECtalk and Emacspeak's DECtalk server on your own computer, following Raman's notes:
+
+```sh
+sudo pacman -S blinux-aster
+blinux-aster-setup
+```
+
+Then in Emacs run `M-x load-library RET aster` followed by `M-x aster`. Its commands are on the `C-; SPC` and `C-' a` prefixes, and `M-x describe-function RET aster` shows its help.
 
 ### Building Emacspeak and AsTeR by hand
 

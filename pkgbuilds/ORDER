@@ -1,5 +1,6 @@
 # Blinux packages from pkgbuilds/, built in this order after the AUR packages.
 emacspeak
+aster-math
 blinux-keyring
 blinux-tools
 blinux-config

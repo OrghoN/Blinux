@@ -96,10 +96,8 @@ grep -qx 'DEFAULT archspeech' profile/syslinux/archiso_sys.cfg ||
 for f in profile/grub/grub.cfg profile/grub/loopback.cfg; do
     grep -qx 'default=archlinux-accessibility' "$f" || err "$f must default to the speech entry"
 done
-for f in profile/efiboot/loader/loader.conf; do
-    t="$(awk '/^timeout/ {print $2}' "$f")"
-    ((t <= 10)) || err "$f: boot menu timeout should be short (is $t s)"
-done
+t="$(awk '/^timeout/ {print $2}' profile/efiboot/loader/loader.conf)"
+((t <= 10)) || err "systemd-boot: the boot menu timeout should be short (is $t s)"
 
 # --- Wayland stays on
 if grep -rqs 'WaylandEnable=false' config tools profile; then

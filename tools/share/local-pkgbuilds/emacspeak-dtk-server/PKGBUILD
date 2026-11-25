@@ -1,0 +1,26 @@
+# Emacspeak's Software DECtalk speech server (servers/software-dtk), which
+# AsTeR speaks through. Built on YOUR computer by blinux-aster-setup, because
+# it links against DECtalk (see the dectalk recipe next to this one).
+#   cd servers/software-dtk && make     (T.V. Raman's Readme.org)
+
+pkgname=emacspeak-dtk-server
+pkgver=1
+pkgrel=1
+pkgdesc="Emacspeak speech server for Software DECtalk (built locally)"
+arch=('x86_64')
+url="https://github.com/tvraman/emacspeak"
+license=('GPL-2.0-or-later')
+depends=('emacspeak' 'dectalk' 'tcl')
+options=('!debug')
+source=()
+
+build() {
+  rm -rf software-dtk
+  cp -r /opt/emacspeak/servers/software-dtk .
+  make -C software-dtk TCL_INCLUDE=/usr/include \
+    CFLAGS="$CFLAGS -fPIC -I/opt/dectalk/include" LDFLAGS="$LDFLAGS -L/opt/dectalk/lib"
+}
+
+package() {
+  install -Dm755 software-dtk/tcldtk.so "$pkgdir/opt/emacspeak/servers/software-dtk/tcldtk.so"
+}

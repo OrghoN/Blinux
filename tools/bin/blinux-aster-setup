@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# blinux-aster-setup: give AsTeR its Software DECtalk voice.
+#
+# Usage: blinux-aster-setup [--yes]
+#
+# AsTeR (the blinux-aster stack) speaks with Software DECtalk through
+# Emacspeak's DECtalk server. DECtalk is proprietary: its licence allows use
+# and copying only with a licence from Fonix. So Blinux doesn't build or
+# distribute it. This command builds it on your own computer, from the
+# dectalk/dectalk sources, with the recipes in
+# /usr/share/blinux/local-pkgbuilds:
+#   1. dectalk               Software DECtalk, installed in /opt/dectalk
+#   2. emacspeak-dtk-server  Emacspeak's servers/software-dtk, linked to it
+# Run it as your normal user; it asks for your password to install.
+set -euo pipefail
+
+here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+if [[ -f "$here/../lib/common.sh" ]]; then lib="$here/../lib"; else lib=/usr/lib/blinux; fi
+# shellcheck source=tools/lib/common.sh
+source "$lib/common.sh"
+
+YES=0
+[[ "${1:-}" == --yes ]] && YES=1
+[[ "${1:-}" == -h || "${1:-}" == --help ]] && { sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 0; }
+[[ $EUID -ne 0 ]] || die "Run this as your normal user, not as root. It uses sudo to install."
+
+recipes="${BLINUX_RECIPES:-$(dirname "$BLINUX_SCHEMA")/local-pkgbuilds}"
+[[ -d "$recipes" ]] || die "The build recipes are missing: $recipes"
+
+say "AsTeR speaks with Software DECtalk."
+say "DECtalk is proprietary software. Its licence says it may be used and copied only with a licence from Fonix."
+say "Blinux does not distribute it. This will download its source code and build it on this computer."
+if ((!YES)) && ! ask_yes_no "Continue only if you are entitled to use DECtalk. Continue?" no; then
+    say "Nothing was changed. AsTeR is installed, but has no DECtalk voice."
+    exit 0
+fi
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+for pkg in dectalk emacspeak-dtk-server; do
+    say "Building $pkg. This takes a few minutes."
+    cp -r "$recipes/$pkg" "$work/"
+    (cd "$work/$pkg" && runcmd makepkg --syncdeps --install --needed --noconfirm >>"$work/build.log" 2>&1) || {
+        say "Building $pkg failed. The last lines of the log say:"
+        tail -n 5 "$work/build.log"
+        exit 1
+    }
+done
+say "Done. In Emacs, run M-x load-library RET aster, then M-x aster."

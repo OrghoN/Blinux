@@ -372,6 +372,9 @@ install_system() {
     setup_dotfiles
     unmount_all
     say "Installation complete."
+    if jq -e '.stacks // [] | index("aster")' <<<"$CONFIG" >/dev/null; then
+        say "AsTeR is installed. To give it its DECtalk voice, run blinux-aster-setup after the first boot."
+    fi
     if ((${#SKIPPED_PACKAGES[@]})); then
         say "Remember to install the skipped packages later: ${SKIPPED_PACKAGES[*]}"
     fi

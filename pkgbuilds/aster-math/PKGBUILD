@@ -12,8 +12,9 @@
 #   then add aster-math/ui/ to load-path, M-x load-library aster, M-x aster
 #
 # Installed at /opt/emacspeak/aster-math, inside the Emacspeak tree as the post
-# describes. AsTeR speaks through Emacspeak's Software DECtalk server
-# (servers/software-dtk), which is built here against the dectalk package.
+# describes. AsTeR speaks with Software DECtalk, which is proprietary, so it
+# isn't a dependency here: blinux-aster-setup builds DECtalk and Emacspeak's
+# DECtalk server on the user's own computer (tools/share/local-pkgbuilds).
 
 pkgname=aster-math
 _commit=8e4e4dd1fa503e026fe3ec0b9f25d5fd54c8eea3
@@ -24,7 +25,8 @@ arch=('x86_64')
 url="https://github.com/tvraman/aster-math"
 # Upstream has no license file yet.
 license=('LicenseRef-unspecified')
-depends=('emacspeak>=57' 'dectalk' 'sbcl' 'flex' 'emacs-slime' 'auctex' 'tcl')
+depends=('emacspeak>=57' 'sbcl' 'flex' 'emacs-slime' 'auctex')
+optdepends=("dectalk: AsTeR's voice; build it locally with blinux-aster-setup")
 makedepends=('git')
 source=("aster-math::git+https://github.com/tvraman/aster-math.git#commit=${_commit}"
         "60-aster.el")
@@ -41,18 +43,11 @@ build() {
   cd "$srcdir/aster-math/lisp"
   sbcl --script aster.lisp
   make -C lexer CFLAGS="-O2 -std=gnu17"
-
-  # Emacspeak's Software DECtalk server, so AsTeR can speak with DECtalk.
-  rm -rf "$srcdir/software-dtk"
-  cp -r /opt/emacspeak/servers/software-dtk "$srcdir/software-dtk"
-  make -C "$srcdir/software-dtk" TCL_INCLUDE=/usr/include \
-    CFLAGS="$CFLAGS -fPIC -I/usr/include/dectalk -I/usr/include" \
-    LDFLAGS="$LDFLAGS -L/usr/lib/dectalk"
 }
 
 check() {
   test -x "$srcdir/aster-math/lisp/lexer/lispify"
-  test -f "$srcdir/software-dtk/tcldtk.so"
+  printf '$x^2$' | "$srcdir/aster-math/lisp/lexer/lispify" | grep -q inline-math
 }
 
 package() {
@@ -61,8 +56,6 @@ package() {
   rm -rf "$pkgdir/opt/emacspeak/aster-math/.git"
   find "$pkgdir/opt/emacspeak/aster-math" -name '*.fasl' -delete
 
-  install -Dm755 "$srcdir/software-dtk/tcldtk.so" \
-    "$pkgdir/opt/emacspeak/servers/software-dtk/tcldtk.so"
   install -Dm644 "$srcdir/60-aster.el" \
     "$pkgdir/usr/share/emacs/site-lisp/site-start.d/60-aster.el"
 }

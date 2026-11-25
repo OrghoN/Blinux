@@ -7,12 +7,11 @@ pkgbase = aster-math
 	license = LicenseRef-unspecified
 	makedepends = git
 	depends = emacspeak>=57
-	depends = dectalk
 	depends = sbcl
 	depends = flex
 	depends = emacs-slime
 	depends = auctex
-	depends = tcl
+	optdepends = dectalk: AsTeR's voice; build it locally with blinux-aster-setup
 	source = aster-math::git+https://github.com/tvraman/aster-math.git#commit=8e4e4dd1fa503e026fe3ec0b9f25d5fd54c8eea3
 	source = 60-aster.el
 	sha256sums = SKIP

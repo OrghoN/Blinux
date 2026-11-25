@@ -1,8 +1,9 @@
 # blinux-aster: AsTeR spoken math (T.V. Raman's aster-math), optional.
 # Prerequisites from the Emacspeak blog post of 2022-12-21: Emacspeak >= 57,
 # slime, auctex, flex, SBCL (which bundles ASDF) and Software DECtalk.
+# DECtalk is proprietary, so it isn't here: blinux-aster-setup builds it on the
+# user's own computer after installation.
 aster-math
-dectalk
 sbcl
 cl-asdf-flv
 flex

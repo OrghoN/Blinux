@@ -160,7 +160,10 @@ already_built() {
 }
 
 build_dir() {
-    local dir="$1" user
+    # AUR packages skip their own test suites (--nocheck): their checkdepends
+    # form cycles. Blinux's packages always run check().
+    local dir="$1" user extra=()
+    [[ "$dir" == "$BUILD_DIR/aur/"* ]] && extra=(--nocheck)
     user="$(build_user)"
     if already_built "$dir"; then
         log "$(basename "$dir") is up to date"
@@ -170,7 +173,7 @@ build_dir() {
     [[ $EUID -eq 0 ]] && chown -R "$user" "$dir"
     case "$MODE" in
         chroot)
-            (cd "$dir" && makechrootpkg -c -U "$user" -r "$CHROOT_DIR" -- --noconfirm)
+            (cd "$dir" && makechrootpkg -c -U "$user" -r "$CHROOT_DIR" -- --noconfirm "${extra[@]}")
             ;;
         nodeps)
             (cd "$dir" && as_user makepkg -d -f --noconfirm)

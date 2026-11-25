@@ -1,0 +1,50 @@
+# Software DECtalk, built on YOUR computer by blinux-aster-setup.
+#
+# DECtalk is proprietary (see LICENCE in its sources: use and copying need a
+# licence from Fonix). Blinux therefore never builds or publishes DECtalk
+# binaries; this recipe ships so you can build it yourself, if you are entitled
+# to use it, the way T.V. Raman's Emacspeak notes describe
+# (emacspeak/servers/software-dtk/Readme.org):
+#   cd src && autoreconf -f -i && ./configure && make && make install
+# into /opt/dectalk, with Emacspeak's DECtalk.conf.
+
+pkgname=dectalk
+_commit=986ea12ec8dac85881394d7bd7daf1f1d5098b9a  # develop branch, 2026-10-08
+pkgver=20261008
+pkgrel=1
+pkgdesc="Software DECtalk text-to-speech (built locally; proprietary)"
+arch=('x86_64')
+url="https://github.com/dectalk/dectalk"
+license=('LicenseRef-Fonix-proprietary')
+depends=('alsa-lib' 'libpulse')
+makedepends=('autoconf' 'automake' 'git')
+options=('!debug')
+source=("dectalk::git+https://github.com/dectalk/dectalk.git#commit=${_commit}")
+sha256sums=('SKIP')
+
+prepare() {
+  cd dectalk/src
+  # Symlinks in /usr/bin must point at the installed files, not into $pkgdir.
+  sed -i 's|ln -sf $(DESTDIR)$(INSTALL_PREFIX)/|ln -sf $(INSTALL_PREFIX)/|' Makefile.in
+  # The sources predate C23 and GCC 14+'s stricter defaults.
+  sed -i 's|^\(\t\*-\*-linux-\*) WARN_FLAGS=" -Wall\)|\1 -std=gnu17 -Wno-incompatible-pointer-types -Wno-implicit-function-declaration -Wno-int-conversion|' configure.ac
+  autoreconf -f -i
+  ./configure --prefix=/opt/dectalk
+}
+
+build() {
+  cd dectalk/src
+  make
+}
+
+package() {
+  cd dectalk/src
+  make DESTDIR="$pkgdir" install
+  # Emacspeak's DECtalk.conf uses absolute dictionary paths (Raman's step 4).
+  install -Dm644 /opt/emacspeak/servers/software-dtk/DECtalk.conf "$pkgdir/opt/dectalk/DECtalk.conf"
+  # Make the libraries and headers findable (Raman's steps 2 and 3).
+  install -Dm644 /dev/stdin "$pkgdir/etc/ld.so.conf.d/dectalk.conf" <<<"/opt/dectalk/lib"
+  install -d "$pkgdir/usr/include"
+  ln -s /opt/dectalk/include/dtk "$pkgdir/usr/include/dtk"
+  install -Dm644 ../LICENCE "$pkgdir/usr/share/licenses/$pkgname/LICENCE"
+}
