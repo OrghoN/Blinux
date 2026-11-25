@@ -16,7 +16,7 @@ The audio stack copies the author's working machine: **PulseAudio** is the sound
 | 3 | Shell and editor | zsh/oh-my-zsh default; Emacs + Emacspeak working with speech server |
 | 4 | Technical reading | AsTeR (aster-math + Software DECtalk) reading LaTeX math; SRE math in Emacspeak by default |
 | 5 | Dotfiles integration | Installer optionally clones and applies `OrghoN/.dotfiles` |
-| 6 | HEP + ML stacks | ROOT, Geant4, Python scientific stack, PyTorch/JAX, CUDA option |
+| 6 | Optional stacks + drivers | `blinux-hep`, `blinux-ml`, `blinux-ml-cuda`, `blinux-aster`, `blinux-docs`; NVIDIA/CUDA as an install-time choice |
 | 7 | Release | Signed ISO, checksums, docs, accessibility test pass |
 
 ---
@@ -47,8 +47,8 @@ The audio stack copies the author's working machine: **PulseAudio** is the sound
 - **Emacspeak and AsTeR are built from source** (Raman's instructions), so their PKGBUILDs have to track upstream. AsTeR also depends on Software DECtalk, which has to be built and packaged too.
 - **Audio contention.** espeakup (a root system service), speech-dispatcher, PulseAudio and PipeWire all touch the sound card. The author's machine runs them side by side. Blinux reproduces that exact setup (see "Audio and speech") instead of inventing a new one, but the GDM-to-session and TTY-to-desktop hand-offs still need testing on every release.
 - **Wayland gaps.** Blinux is Wayland-only: GNOME on Wayland, with XWayland for X11 apps, and no Xorg session. Orca on Wayland still has a few gaps (some global keyboard grabs and apps that are only half Wayland-native). Track them in Orca's issue tracker instead of shipping an X11 fallback.
-- **CUDA and proprietary drivers** can't be shipped freely in every configuration. Make them an install-time choice.
-- **ISO size.** ROOT, Geant4 data files, PyTorch and CUDA are huge. Consider a "base" ISO with an optional stack you pull after install.
+- **CUDA and proprietary drivers** can't be shipped freely in every configuration, so they're an install-time choice and never on the ISO (see "Hardware drivers and CUDA").
+- **ISO size.** The ISO only carries the base stack. ROOT, Geant4 data, PyTorch, CUDA, TeX Live and AsTeR's toolchain are optional stacks installed from the network (see "Base and optional stacks").
 
 ---
 
@@ -72,19 +72,21 @@ blinux/
 │   │   └── usr/local/bin/blinux-install
 │   ├── grub/ syslinux/ efiboot/   # boot menus with accessible entries as default
 ├── packages/
-│   ├── base.txt               # core system
-│   ├── accessibility.txt      # orca, espeakup, speech-dispatcher, brltty, ...
-│   ├── desktop.txt            # gnome + gdm
-│   ├── dev.txt                # git, compilers, emacs, zsh, ...
-│   ├── hep.txt                # root, geant4, ...
-│   ├── ml.txt                 # python-pytorch, jupyter, ...
+│   ├── base.txt               # blinux-base: system, audio, speech, GNOME, shell, editor, core dev
+│   ├── drivers-nvidia.txt     # install-time choice
+│   ├── cuda.txt               # install-time choice
+│   ├── aster.txt              # optional stacks ↓
+│   ├── docs.txt
+│   ├── hep.txt
+│   ├── ml.txt
 │   └── aur.txt                # tclx, slime, oh-my-zsh-git, ...
 ├── pkgbuilds/                 # PKGBUILDs for the [blinux] repo
 │   ├── yay/                   # AUR helper, prebuilt so it's there from first boot
 │   ├── emacspeak/
 │   ├── aster-math/            # AsTeR, per Raman's 2022 blog post
 │   ├── dectalk/               # Software DECtalk, needed by AsTeR
-│   └── blinux-config/         # meta + config package (see the `blinux-config` section)
+│   ├── blinux-config/         # config package (see the `blinux-config` section)
+│   └── blinux-meta/           # blinux-base, blinux-hep, blinux-ml, blinux-ml-cuda, blinux-aster, blinux-docs
 ├── installer/                 # talking install script
 ├── scripts/
 │   ├── harvest-packages.sh    # derive lists from the author's machine
@@ -102,9 +104,39 @@ pacman -Qqen > packages/raw-native.txt     # from official repos
 pacman -Qqem > packages/raw-foreign.txt    # AUR / local
 ```
 
-Then sort by hand into the `packages/*.txt` files. Drop anything hardware- or machine-specific: microcode, GPU drivers, laptop tools, personal apps. Hardware-specific packages become installer questions (e.g. `intel-ucode` vs `amd-ucode`, `nvidia` vs `mesa`). A `harvest-packages.sh` script can diff the machine against the current lists over time so new useful packages get flagged.
+Then sort by hand into the `packages/*.txt` files. Drop anything hardware- or machine-specific: microcode, GPU drivers, laptop tools, personal apps. Hardware-specific packages become installer questions (e.g. `intel-ucode` vs `amd-ucode`, open source vs NVIDIA drivers). A `harvest-packages.sh` script can diff the machine against the current lists over time so new useful packages get flagged.
 
-### 3. Live ISO (archiso)
+### 3. Base and optional stacks
+
+Everything installs in two layers. Each layer is a meta-package in `[blinux]`, so the same groups that the installer offers can also be added or removed later with `pacman`/`yay`.
+
+**Base stack (`blinux-base`): always installed, and carried on the ISO as an offline package cache so a base install works without network.**
+
+| Area | Packages |
+|------|----------|
+| System | `base`, `linux`, `linux-firmware`, `sof-firmware`, microcode (`intel-ucode`/`amd-ucode`, chosen by the installer), `networkmanager`, `sudo` |
+| Build / AUR | `base-devel`, `git`, `yay` |
+| Audio | `pulseaudio`, `pulseaudio-alsa`, `pulseaudio-bluetooth`, `pipewire`, `pipewire-media-session`, `alsa-utils`, `alsa-ucm-conf` |
+| Speech and braille | `espeak-ng`, `speech-dispatcher`, `espeakup`, `orca`, `brltty` |
+| Desktop | `gnome`, `gdm`, `xorg-xwayland`, `mesa` |
+| Shell | `zsh`, oh-my-zsh |
+| Editor | `emacs`, `emacspeak`, `speech-rule-engine` (SRE math) |
+| Core dev | `gcc`, `clang`, `cmake`, `ninja`, `gdb`, `python`, `python-pip`, `uv` |
+| Config | `blinux-config` |
+
+**Optional stacks: picked in the installer (none are selected by default), installed from the network, and installable later.**
+
+| Meta-package | Contents | Install later with |
+|--------------|----------|--------------------|
+| `blinux-aster` | `aster-math`, `dectalk`, `sbcl`, `flex`, `cl-asdf`, `slime`, `auctex` | `sudo pacman -S blinux-aster` |
+| `blinux-docs` | `texlive`, `pandoc`, `liblouis` | `sudo pacman -S blinux-docs` |
+| `blinux-hep` | ROOT, Geant4, Pythia8, FastJet, … (see "HEP and ML stacks") | `sudo pacman -S blinux-hep` |
+| `blinux-ml` | Python scientific stack, PyTorch (CPU), JAX, Jupyter | `sudo pacman -S blinux-ml` |
+| `blinux-ml-cuda` | `cuda`, `cudnn`, `python-pytorch-cuda` (needs NVIDIA drivers; see "Hardware drivers and CUDA") | `sudo pacman -S blinux-ml-cuda` |
+
+Proprietary bits (NVIDIA drivers, CUDA) are **never in the base stack or on the ISO**. They're always an install-time choice, which keeps the ISO freely redistributable and small enough to download.
+
+### 4. Live ISO (archiso)
 
 - Start from `releng`: `cp -r /usr/share/archiso/configs/releng profile/`.
 - The Arch ISO already ships `espeakup` and has an accessible boot entry ("Arch Linux install medium with speech"). In Blinux, **make the speech entry the default** and give the menu a short timeout, so a blind user just waits and gets speech.
@@ -113,7 +145,7 @@ Then sort by hand into the `packages/*.txt` files. Drop anything hardware- or ma
 - A welcome message, read aloud on login, explains how to start the installer: `blinux-install`.
 - Build: `mkarchiso -v -w /tmp/archiso-work -o out/ profile/`.
 
-### 4. Audio and speech
+### 5. Audio and speech
 
 Several audio systems coexist on the author's machine (checked 2026-11-25). Blinux copies that setup as-is:
 
@@ -144,14 +176,31 @@ How each speech path reaches the speakers:
 
 `blinux-config` ships these configs. The installer runs `alsactl store` after unmuting and setting the default volume, so the first boot is never silent.
 
-### 5. Display: Wayland with XWayland
+### 6. Display: Wayland with XWayland
 
 - GNOME runs on Wayland only. GDM keeps `WaylandEnable=true` (the default). Ship no Xorg session and don't install `xorg-server`.
 - `xorg-xwayland` is always installed (it's on the author's machine too) so X11-only apps keep working inside the Wayland session, e.g. ROOT's X11 GUI (`TBrowser`, canvases), older Java/Tk apps and some HEP event displays. AT-SPI works for X11 apps under XWayland too, so Orca can still read them.
 - Set `QT_QPA_PLATFORM=wayland;xcb` and `MOZ_ENABLE_WAYLAND=1` (already the default in current Firefox) in `/etc/environment.d/` so toolkits use Wayland first and fall back to X11.
 - With NVIDIA proprietary drivers (see "Hardware drivers and CUDA"), `nvidia_drm.modeset=1` must be set. Otherwise GDM's udev rule quietly disables Wayland and the user lands in a session Blinux doesn't support.
 
-### 6. `blinux-config` meta package
+### 7. Hardware drivers and CUDA
+
+Graphics drivers are chosen **at install time**. The installer detects the GPU (`lspci -d ::03xx`), reads it aloud, and suggests a default. The user can override it.
+
+| Choice | Packages | When |
+|--------|----------|------|
+| 1. Open source (default) | `mesa`, `vulkan-intel` / `vulkan-radeon`, `intel-media-driver` / `libva-mesa-driver` | Intel, AMD, or NVIDIA with `nouveau`. (The author's machine has Intel Iris Xe.) |
+| 2. NVIDIA proprietary | `nvidia-open` (Turing and newer) or `nvidia` (older), `nvidia-utils`, `nvidia-settings`, optional `lib32-nvidia-utils` | NVIDIA GPU detected |
+| 3. NVIDIA proprietary + CUDA | choice 2 + `cuda`, `cudnn`; if `blinux-ml` is also chosen, it swaps `python-pytorch` for `python-pytorch-cuda` (i.e. installs `blinux-ml-cuda`) | NVIDIA GPU and GPU compute wanted |
+
+For choices 2 and 3, the installer also:
+- adds `nvidia_drm.modeset=1` to the kernel command line so GNOME stays on Wayland (see "Display"),
+- adds the `nvidia` modules to `mkinitcpio.conf` and rebuilds the initramfs,
+- installs a pacman hook so that kernel updates rebuild the initramfs.
+
+Other non-free firmware (e.g. `broadcom-wl` for some Wi-Fi cards) is handled the same way: detect it, explain it, ask. To switch drivers after install, run `blinux-drivers` (a small helper using the same logic), so nobody has to reinstall to add CUDA.
+
+### 8. `blinux-config` meta package
 
 Put all system configuration in one package instead of scattering it across the installer. That way, installed systems pick up config updates through `pacman -Syu` (or `yay`).
 
@@ -166,7 +215,7 @@ It depends on the accessibility and desktop package lists and installs:
 - `/etc/skel/.emacs.d/` or a site-start file that loads Emacspeak.
 - The default shell for new users is set by the installer (`useradd -s /usr/bin/zsh`).
 
-### 7. Installer
+### 9. Installer
 
 **Option A (recommended to start):** a `blinux-install` shell script that wraps `archinstall` with a JSON config (`--config blinux.json`). Use `archinstall`'s menu-free mode, with the script asking the few required questions through plain line-by-line `read` prompts. These work well with espeakup; curses menus don't.
 
@@ -175,21 +224,22 @@ Questions to ask:
 2. Encryption yes/no, and the passphrase.
 3. Console speech on the installed system (espeakup through PulseAudio)? Default no, matching the author's machine.
 4. Username, password and hostname.
-5. Hardware: CPU microcode, GPU (mesa / nvidia / nvidia + CUDA).
-6. Optional stacks: HEP, ML, both, neither.
-7. Clone `OrghoN/.dotfiles`? (y/n, plus a custom URL.)
+5. CPU microcode (detected automatically, then confirmed).
+6. Graphics driver: open source / NVIDIA proprietary / NVIDIA proprietary + CUDA (see "Hardware drivers and CUDA").
+7. Optional stacks, one yes/no question each: AsTeR, documents, HEP, ML (choosing ML together with CUDA installs `blinux-ml-cuda`).
+8. Clone `OrghoN/.dotfiles`? (y/n, plus a custom URL.)
 
-Then: partition → pacstrap base + `base-devel` + `git` + `yay` + `blinux-config` + chosen stacks → bootloader (systemd-boot or GRUB) → enable `gdm`, `NetworkManager`, `bluetooth` (and `espeakup` only if the user asked for console speech) → copy the audio mixer state (`alsactl store`) so volume isn't muted on first boot → speak "Installation complete, remove the media and press Enter to reboot."
+Then: partition → pacstrap `blinux-base` from the ISO's offline cache → install the chosen drivers and optional stacks from the network (skipped with a spoken warning if offline; they can be installed later) → bootloader (systemd-boot or GRUB) → enable `gdm`, `NetworkManager`, `bluetooth` (and `espeakup` only if the user asked for console speech) → copy the audio mixer state (`alsactl store`) so volume isn't muted on first boot → speak "Installation complete, remove the media and press Enter to reboot."
 
 **Option B (later):** a custom Python installer built on the `archinstall` library, for better error handling and progress that's spoken aloud.
 
-### 8. Shell: zsh and oh-my-zsh
+### 10. Shell: zsh and oh-my-zsh
 
 - Install `zsh`, and `oh-my-zsh-git` from the AUR (repackaged in `[blinux]`) or vendor it into `/usr/share/oh-my-zsh`.
 - Theme: a plain-ASCII prompt. Avoid `agnoster`, `powerlevel10k` and right prompts (RPROMPT), which clutter speech output.
 - Useful plugins: `git`, `sudo`, `history-substring-search`, `zsh-autosuggestions` (consider disabling it by default, since inline suggestions can be noisy with speakup).
 
-### 9. AUR helper: yay
+### 11. AUR helper: yay
 
 `yay` is part of the system from the start, so the user never has to bootstrap it by hand. Bootstrapping means cloning, `makepkg` and reading build output by ear, which is the kind of fiddly first-boot task Blinux exists to remove.
 
@@ -200,7 +250,7 @@ Then: partition → pacstrap base + `base-devel` + `git` + `yay` + `blinux-confi
 - **Post-install stacks:** the HEP/ML bundles that need AUR packages (e.g. `geant4`, `delphes`) can be installed after setup with `yay -S blinux-hep`. They also come prebuilt in `[blinux]`, so yay mostly handles the user's own extras.
 - **Test:** after install, run `yay -S --noconfirm` on a small AUR package as the new user in the QEMU test.
 
-### 10. Emacs, Emacspeak and AsTeR
+### 12. Emacs, Emacspeak and AsTeR
 
 Both are built from source, following T.V. Raman's own instructions: the [Emacspeak manual's Quick Installation](https://tvraman.github.io/emacspeak/manual/Quick-Installation.html) and the [Emacspeak blog post "AsTeR: Spoken Math On The Emacspeak Audio Desktop" (2022-12-21)](https://emacspeak.blogspot.com/2022). The PKGBUILDs in `pkgbuilds/` script exactly these steps, so `[blinux]` ships prebuilt packages. The same steps are documented in the README for anyone building by hand.
 
@@ -241,13 +291,13 @@ Packaging: `pkgbuilds/dectalk/` (Software DECtalk) and `pkgbuilds/aster-math/` (
 
 - Also in the documents stack: `texlive`, `pandoc`, `liblouis` (braille translation) and `brltty`.
 
-### 11. Dotfiles integration
+### 13. Dotfiles integration
 
 - The installer clones `https://github.com/OrghoN/.dotfiles` into `~/.dotfiles` as the new user and runs its bootstrap (stow, chezmoi, a script, whatever the repo uses).
 - Blinux defaults should live in `/etc/skel` and `/etc` (system level), so user dotfiles override them cleanly without conflicts.
 - Coordinate: anything accessibility-critical (Orca enabled, speech-dispatcher config) stays system-level, so a broken dotfile can't make the machine silent.
 
-### 12. HEP and ML stacks
+### 14. HEP and ML stacks
 
 **HEP (`packages/hep.txt`)**
 - `root` (already on the author's machine), `geant4` + datasets (AUR, large), `hepmc3`, `pythia8`, `fastjet`, `lhapdf`, `delphes` (AUR), `python-uproot`, `python-awkward`, `python-hist`, `python-scikit-hep` bits.
@@ -255,20 +305,20 @@ Packaging: `pkgbuilds/dectalk/` (Software DECtalk) and `pkgbuilds/aster-math/` (
 
 **ML (`packages/ml.txt`)**
 - `python`, `python-pip`, `python-numpy`, `python-scipy`, `python-pandas`, `python-scikit-learn`, `python-matplotlib`, `jupyterlab` (note: Jupyter's web UI has mixed screen-reader support. Also provide `emacs-jupyter` / `ein` and plain `ipython`).
-- `python-pytorch` / `python-pytorch-cuda`, `python-jax`, `cuda` and `cudnn` (only when the NVIDIA option is chosen).
+- `python-pytorch` (CPU) and `python-jax` in `blinux-ml`. `cuda`, `cudnn` and `python-pytorch-cuda` are only in `blinux-ml-cuda`, which is installed only when the NVIDIA + CUDA driver choice is made.
 - `uv` or `python-poetry` for per-project environments, `conda`/`micromamba` optional for HEP compatibility.
 
 **Accessible plotting:** matplotlib output is visual. Include tools that make data readable without sight, e.g. `python-sonification` libraries (`astronify`, `sonify`), and make sure tabular summaries and `rich`/plain-text output are easy to get.
 
-Ship these as **meta-packages** (`blinux-hep`, `blinux-ml`) so they can be installed after setup and kept out of the base ISO if size is a problem.
+These are the optional `blinux-hep`, `blinux-ml` and `blinux-ml-cuda` meta-packages from "Base and optional stacks". The installer offers them, and they can be installed at any time afterwards.
 
-### 13. Custom repository `[blinux]`
+### 15. Custom repository `[blinux]`
 
 - Build AUR and custom PKGBUILDs in a clean chroot (`extra-x86_64-build` from `devtools`).
 - Sign packages with a dedicated GPG key, and generate the db with `repo-add -s blinux.db.tar.zst *.pkg.tar.zst`.
 - Host it on GitHub Releases or Pages and add it to `pacman.conf`, for both the ISO and installed systems.
 
-### 14. CI and builds
+### 16. CI and builds
 
 - A GitHub Actions workflow running in an `archlinux:latest` container (needs `--privileged` for mkarchiso):
   1. Build the `[blinux]` repo packages.
@@ -276,14 +326,14 @@ Ship these as **meta-packages** (`blinux-hep`, `blinux-ml`) so they can be insta
   3. Upload the ISO + `sha256sums` + signature as an artifact or release.
 - Monthly scheduled rebuild to track Arch updates.
 
-### 15. Testing
+### 17. Testing
 
 - **Automated:** boot the ISO in QEMU (`run_archiso -i out/*.iso` or plain `qemu-system-x86_64 -audiodev pa,...`). Check that `espeakup` is active via `systemctl is-active`, run the installer non-interactively with a test config, boot the installed image, and assert that GDM's dconf has the screen reader enabled and that `yay --version` works for the new user.
 - **Speech capture:** route QEMU audio to a WAV file and check that it isn't silent at key points (boot menu, installer prompt, GDM, desktop).
 - **Audio coexistence:** in the installed image, assert that `pactl info` reports PulseAudio, `pipewire-pulse` is absent, `$XDG_SESSION_TYPE` is `wayland`, and speech keeps working after switching between a TTY and the desktop (Ctrl+Alt+F3, then back).
 - **Manual (essential):** a full install with the monitor off, using only speech, on real hardware, including USB audio and Bluetooth headphones. Ideally with blind testers from the community (e.g. the Arch accessibility mailing list or the Orca users list).
 
-### 16. Suggested order of work
+### 18. Suggested order of work
 
 1. Scaffold the repo, copy `releng`, build an unmodified ISO in CI. Set up the `[blinux]` repo with `yay` as its first package and add it to the ISO.
 2. Make speech the default boot entry; verify in QEMU.
@@ -293,5 +343,5 @@ Ship these as **meta-packages** (`blinux-hep`, `blinux-ml`) so they can be insta
 6. Package Emacspeak (Raman's `make config && make`, espeak server); test coding in Emacs.
 7. Package Software DECtalk and aster-math; test AsTeR on a LaTeX paper; enable SRE math in the base stack.
 8. Add the dotfiles hook.
-9. Add the HEP/ML meta-packages.
+9. Add the `blinux-base` and optional meta-packages, the driver/CUDA installer step and `blinux-drivers`.
 10. Automated QEMU tests, then a full test with the screen off, then the first tagged release.
