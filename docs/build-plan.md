@@ -17,7 +17,7 @@ The audio stack copies the author's working machine: **PulseAudio** is the sound
 | 4 | Technical reading | AsTeR (aster-math + Software DECtalk) reading LaTeX math; SRE math in Emacspeak by default |
 | 5 | Dotfiles integration | Installer optionally clones and applies `OrghoN/.dotfiles` |
 | 6 | Optional stacks + drivers | `blinux-hep`, `blinux-ml`, `blinux-ml-cuda`, `blinux-aster`, `blinux-docs`; NVIDIA/CUDA as an install-time choice |
-| 7 | Release | Signed ISO, checksums, docs, accessibility test pass |
+| 7 | Release | Signed ISO, checksums, README with explanation + full command sequence, accessibility test pass |
 
 ---
 
@@ -333,7 +333,35 @@ These are the optional `blinux-hep`, `blinux-ml` and `blinux-ml-cuda` meta-packa
 - **Audio coexistence:** in the installed image, assert that `pactl info` reports PulseAudio, `pipewire-pulse` is absent, `$XDG_SESSION_TYPE` is `wayland`, and speech keeps working after switching between a TTY and the desktop (Ctrl+Alt+F3, then back).
 - **Manual (essential):** a full install with the monitor off, using only speech, on real hardware, including USB audio and Bluetooth headphones. Ideally with blind testers from the community (e.g. the Arch accessibility mailing list or the Orca users list).
 
-### 18. Suggested order of work
+### 18. README: explanation and setup commands
+
+The README is the entry point. A blind user will read it with a screen reader before they have a working Blinux, so it has to stand on its own. As each piece of the plan lands, **the README must be updated** with a plain-language explanation and the exact sequence of commands to run, in order. Use plain text and fenced code blocks, with no images, badges-only info or tables that are required to follow along. Sections to add:
+
+1. **What Blinux is**: a short explanation of the components (espeakup, Orca, GNOME on Wayland, the PulseAudio + PipeWire setup, Emacspeak, AsTeR, zsh, yay) and what is base vs optional.
+2. **Building the ISO** (on an existing Arch machine):
+   ```sh
+   sudo pacman -S --needed archiso devtools git
+   git clone https://github.com/OrghoN/Blinux.git
+   cd Blinux
+   ./scripts/build-repo.sh      # builds yay, emacspeak, dectalk, aster-math, blinux-* into ./repo
+   sudo ./scripts/build-iso.sh  # runs mkarchiso, writes out/blinux-*.iso
+   ```
+3. **Writing the USB stick**: `lsblk`, then `sudo dd if=out/blinux-<date>-x86_64.iso of=/dev/sdX bs=4M status=progress oflag=sync`, with a warning about choosing the right device.
+4. **Booting and installing**: what you'll hear (the boot menu defaults to speech after a short timeout), then `blinux-install`, and a list of every question it asks (disk, encryption, console speech, user, microcode, graphics driver/CUDA, optional stacks, dotfiles).
+5. **After first boot**: commands for each opt-in:
+   ```sh
+   sudo blinux-console-speech enable     # espeakup on the TTY via PulseAudio
+   sudo blinux-drivers                    # switch to NVIDIA / NVIDIA + CUDA later
+   sudo pacman -S blinux-hep blinux-ml   # optional stacks
+   sudo pacman -S blinux-aster           # AsTeR spoken math
+   git clone https://github.com/OrghoN/.dotfiles ~/.dotfiles   # then that repo's bootstrap
+   ```
+6. **Building Emacspeak and AsTeR by hand**: Raman's command sequences from "Emacs, Emacspeak and AsTeR", with links to the manual and blog post, for people who aren't on Blinux.
+7. **Troubleshooting audio**: `pactl info`, `systemctl --user status pulseaudio speech-dispatcher`, `systemctl status espeakup`, `alsamixer` unmute, and how to tell PipeWire's video role apart from PulseAudio's audio role.
+
+Write the commands only once the scripts exist, and keep them in sync. Each PR that adds or changes a script must update the README's command sequence (add a checklist item to the PR template). The release gate (milestone 7) includes a check that a screen-reader user can follow the README from start to finish.
+
+### 19. Suggested order of work
 
 1. Scaffold the repo, copy `releng`, build an unmodified ISO in CI. Set up the `[blinux]` repo with `yay` as its first package and add it to the ISO.
 2. Make speech the default boot entry; verify in QEMU.
@@ -344,4 +372,7 @@ These are the optional `blinux-hep`, `blinux-ml` and `blinux-ml-cuda` meta-packa
 7. Package Software DECtalk and aster-math; test AsTeR on a LaTeX paper; enable SRE math in the base stack.
 8. Add the dotfiles hook.
 9. Add the `blinux-base` and optional meta-packages, the driver/CUDA installer step and `blinux-drivers`.
-10. Automated QEMU tests, then a full test with the screen off, then the first tagged release.
+10. Automated QEMU tests, then a full test with the screen off.
+11. Update the README with the explanation and the full command sequence (build → USB → install → post-install → troubleshooting). Follow it with only a screen reader to check it, then make the first tagged release.
+
+Throughout: every step above that adds a script or user-facing command also updates the README in the same commit.
