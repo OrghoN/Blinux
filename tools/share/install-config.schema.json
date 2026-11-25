@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/OrghoN/Blinux/tools/share/install-config.schema.json",
+  "title": "Blinux install config",
+  "description": "Answers for blinux-install. Interactive installs build this same object; --config reads it from a file for unattended installs.",
+  "type": "object",
+  "required": ["disk", "username", "password"],
+  "additionalProperties": false,
+  "properties": {
+    "disk": {"type": "string", "pattern": "^/dev/", "description": "Whole disk to erase, e.g. /dev/nvme0n1"},
+    "firmware": {"enum": ["auto", "uefi", "bios"], "default": "auto"},
+    "encrypt": {"type": "boolean", "default": false},
+    "passphrase": {"type": "string", "description": "LUKS passphrase; required when encrypt is true"},
+    "console_speech": {"type": "boolean", "default": false, "description": "espeakup on the text consoles, through PulseAudio"},
+    "username": {"type": "string", "pattern": "^[a-z_][a-z0-9_-]{0,31}$", "not": {"const": "root"}},
+    "password": {"type": "string", "minLength": 1},
+    "hostname": {"type": "string", "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$", "default": "blinux"},
+    "timezone": {"type": "string", "default": "UTC"},
+    "locale": {"type": "string", "default": "en_US.UTF-8"},
+    "keymap": {"type": "string", "default": "us"},
+    "microcode": {"enum": ["auto", "intel", "amd", "none"], "default": "auto"},
+    "graphics": {"enum": ["open", "nvidia", "nvidia-cuda"], "default": "open"},
+    "stacks": {
+      "type": "array",
+      "items": {"enum": ["aster", "docs", "hep", "ml"]},
+      "uniqueItems": true,
+      "default": []
+    },
+    "dotfiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "default": false},
+        "url": {"type": "string"}
+      }
+    },
+    "broadcom_wl": {"type": "boolean", "default": false},
+    "reboot": {"type": "boolean", "default": false}
+  },
+  "if": {"properties": {"encrypt": {"const": true}}, "required": ["encrypt"]},
+  "then": {"required": ["passphrase"]}
+}

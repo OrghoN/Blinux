@@ -1,0 +1,11 @@
+{
+  "disk": "/dev/vda",
+  "firmware": "uefi",
+  "username": "tester",
+  "password": "blinux-test",
+  "hostname": "blinux-test",
+  "microcode": "none",
+  "graphics": "open",
+  "stacks": [],
+  "reboot": false
+}

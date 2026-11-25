@@ -1,0 +1,1 @@
+01:00.0 "VGA compatible controller [0300]" "NVIDIA Corporation [10de]" "GP107 [GeForce GTX 1050 Ti] [1c82]" -ra1 "ASUSTeK Computer Inc. [1043]" "Device [8613]"

@@ -1,0 +1,228 @@
+#!/usr/bin/env bash
+# blinux-install: the talking Blinux installer.
+#
+# Usage:
+#   blinux-install                      ask questions one at a time, then install
+#   blinux-install --config FILE        unattended install from a JSON config
+#   blinux-install --save-config FILE   ask the questions, write the config, stop
+#   blinux-install --dry-run ...        print every command instead of running it
+#
+# Every question is plain text on its own line, every option is read out with
+# its number, and nothing is changed on disk until you have heard a summary
+# and typed "install". The config format is documented in
+# /usr/share/blinux/install-config.schema.json.
+set -euo pipefail
+
+here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+if [[ -f "$here/../lib/common.sh" ]]; then lib="$here/../lib"; else lib=/usr/lib/blinux; fi
+# shellcheck source=tools/lib/common.sh
+source "$lib/common.sh"
+# shellcheck source=tools/lib/detect.sh
+source "$lib/detect.sh"
+# shellcheck source=tools/lib/drivers.sh
+source "$lib/drivers.sh"
+# shellcheck source=tools/lib/packages.sh
+source "$lib/packages.sh"
+# shellcheck source=tools/lib/install.sh
+source "$lib/install.sh"
+
+CONFIG_FILE=""
+SAVE_CONFIG=""
+LOG_FILE="${LOG_FILE:-/var/log/blinux-install.log}"
+
+while (($#)); do
+    case "$1" in
+        --config) CONFIG_FILE="$2"; shift 2 ;;
+        --save-config) SAVE_CONFIG="$2"; shift 2 ;;
+        --dry-run) DRY_RUN=1; shift ;;
+        -h | --help) sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 0 ;;
+        *) die "unknown argument: $1 (try --help)" ;;
+    esac
+done
+
+# The installer writes into the new system mounted at $MNT.
+ROOT="$MNT"
+if [[ "$DRY_RUN" == 1 && "$LOG_FILE" == /var/log/blinux-install.log ]]; then
+    LOG_FILE=/dev/null
+fi
+
+# ---------------------------------------------------------------- questions
+
+ask_disk() {
+    local lines=() options=() path size tran model i
+    mapfile -t lines < <(disks)
+    ((${#lines[@]})) || die "No disks were found to install on."
+    for i in "${lines[@]}"; do
+        read -r path size tran model <<<"$i"
+        options+=("$path, $(human_size "$size"), $model, connected by $tran")
+    done
+    local n
+    n="$(choose "Which disk should Blinux be installed on? Everything on it will be erased." 1 "${options[@]}")"
+    read -r DISK _ <<<"${lines[n - 1]}"
+    confirm_twice "All data on $DISK will be erased." erase || die "Not confirmed. Nothing was changed."
+}
+
+ask_username() {
+    local user
+    while true; do
+        user="$(ask "What user name would you like? Use lowercase letters and digits.")"
+        if [[ "$user" =~ ^[a-z_][a-z0-9_-]{0,31}$ && "$user" != root ]]; then
+            printf '%s\n' "$user"
+            return 0
+        fi
+        say "That user name can't be used. Start with a letter, and use only lowercase letters, digits, dashes or underscores." >&2
+    done
+}
+
+ask_timezone() {
+    local tz
+    while true; do
+        tz="$(ask "What is your time zone? For example America/Toronto or Europe/London." UTC)"
+        if [[ -f "/usr/share/zoneinfo/$tz" ]]; then
+            printf '%s\n' "$tz"
+            return 0
+        fi
+        say "I don't know the time zone $tz. Use the Region/City form." >&2
+    done
+}
+
+ask_graphics() {
+    local suggested default=1 desc line
+    say "Graphics cards found:" >&2
+    while read -r line; do
+        [[ -n "$line" ]] && say "  ${line#* * }" >&2
+    done < <(gpus)
+    suggested="$(suggested_graphics)"
+    [[ "$suggested" == nvidia ]] && default=2
+    if has_gpu nvidia legacy && ! has_gpu nvidia turing+; then
+        say "This NVIDIA card is older than the Turing generation. The NVIDIA proprietary driver Blinux offers doesn't support it, so the open source driver is recommended." >&2
+    fi
+    desc="$(choose "Which graphics drivers should be installed? The suggestion is option $default." "$default" \
+        "open source drivers. Works on every card and needs no network" \
+        "NVIDIA proprietary drivers. Downloaded during installation" \
+        "NVIDIA proprietary drivers with CUDA, for GPU computing. A large download")"
+    case "$desc" in 1) echo open ;; 2) echo nvidia ;; 3) echo nvidia-cuda ;; esac
+}
+
+interactive_config() {
+    say "Welcome to the Blinux installer."
+    say "I will ask a few questions, one at a time. Nothing changes on disk until you confirm at the end."
+    if network_online; then
+        say "The network is connected."
+    else
+        say "There is no network connection. The base system can still be installed from the install medium; drivers and optional stacks need a network."
+    fi
+
+    ask_disk
+
+    local encrypt=false passphrase=""
+    if ask_yes_no "Encrypt the disk? You will type a passphrase every time the computer starts." no; then
+        encrypt=true
+        passphrase="$(ask_secret "Choose a disk encryption passphrase.")"
+    fi
+
+    local console_speech=false
+    if ask_yes_no "Turn on speech on the text consoles too? The desktop always has speech from Orca." no; then
+        console_speech=true
+    fi
+
+    local user password host tz
+    user="$(ask_username)"
+    password="$(ask_secret "Choose a password for $user.")"
+    host="$(ask "What should this computer be called?" blinux)"
+    tz="$(ask_timezone)"
+
+    local vendor microcode
+    vendor="$(cpu_vendor)"
+    microcode="$vendor"
+    if [[ "$vendor" == unknown ]]; then
+        microcode=none
+        say "I couldn't tell who made the processor, so no microcode updates will be installed."
+    else
+        local name=Intel
+        [[ "$vendor" == amd ]] && name=AMD
+        ask_yes_no "This is an $name processor. Install $name microcode updates?" yes || microcode=none
+    fi
+
+    local graphics
+    graphics="$(ask_graphics)"
+
+    local stacks=() s
+    say "Next, the optional stacks. Each can also be installed later."
+    for s in "${STACKS[@]}"; do
+        if ask_yes_no "Install $(stack_describe "$s")?" no; then stacks+=("$s"); fi
+    done
+
+    local dotfiles=false url=""
+    if ask_yes_no "Set up dotfiles from a git repository?" no; then
+        dotfiles=true
+        url="$(ask "What is the repository address?" https://github.com/OrghoN/.dotfiles)"
+    fi
+
+    local broadcom=false
+    if needs_broadcom_wl && ask_yes_no "A Broadcom Wi-Fi card was found. It needs the non-free broadcom-wl driver. Install it?" yes; then
+        broadcom=true
+    fi
+
+    CONFIG="$(jq -n \
+        --arg disk "$DISK" --argjson encrypt "$encrypt" --arg passphrase "$passphrase" \
+        --argjson console_speech "$console_speech" --arg username "$user" \
+        --arg password "$password" --arg hostname "$host" --arg timezone "$tz" \
+        --arg microcode "$microcode" --arg graphics "$graphics" \
+        --argjson dotfiles "$dotfiles" --arg url "$url" --argjson broadcom "$broadcom" \
+        --args '{
+            disk: $disk, encrypt: $encrypt, passphrase: $passphrase,
+            console_speech: $console_speech, username: $username, password: $password,
+            hostname: $hostname, timezone: $timezone, microcode: $microcode,
+            graphics: $graphics, stacks: $ARGS.positional,
+            dotfiles: {enabled: $dotfiles, url: $url},
+            broadcom_wl: $broadcom
+        }' "${stacks[@]}")"
+    validate_config
+}
+
+summary() {
+    local stacks
+    stacks="$(jq -r '.stacks // [] | join(", ")' <<<"$CONFIG")"
+    say "Here is what will happen:"
+    say "Erase $(cfg .disk) and install Blinux."
+    if [[ "$(cfg .encrypt false)" == true ]]; then say "Encrypt the disk."; fi
+    say "Create the user $(cfg .username) on the computer $(cfg .hostname blinux), time zone $(cfg .timezone UTC)."
+    say "Graphics: $(graphics_describe "$(cfg .graphics open)")."
+    say "Optional stacks: ${stacks:-none}."
+    if [[ "$(cfg .console_speech false)" == true ]]; then say "Console speech: on."; else say "Console speech: off."; fi
+    if [[ "$(cfg .dotfiles.enabled false)" == true ]]; then say "Dotfiles from $(cfg .dotfiles.url)."; fi
+}
+
+# ---------------------------------------------------------------- main
+
+if [[ -n "$CONFIG_FILE" ]]; then
+    load_config "$CONFIG_FILE"
+    DISK="$(cfg .disk)"
+else
+    interactive_config
+fi
+
+if [[ -n "$SAVE_CONFIG" ]]; then
+    (umask 077 && jq . <<<"$CONFIG" >"$SAVE_CONFIG")
+    say "Saved the answers to $SAVE_CONFIG. Nothing was installed."
+    exit 0
+fi
+
+summary
+if [[ -z "$CONFIG_FILE" ]]; then
+    answer="$(ask "Type install to begin, or anything else to stop.")"
+    [[ "$answer" == install ]] || die "Stopped. Nothing was changed."
+fi
+
+if [[ "$DRY_RUN" != 1 && $EUID -ne 0 ]]; then
+    die "The installer must run as root. On the install medium you already are."
+fi
+
+install_system
+
+if [[ "$(cfg .reboot false)" == true ]]; then
+    run systemctl reboot
+else
+    say "Remove the install medium, then type reboot and press Enter."
+fi

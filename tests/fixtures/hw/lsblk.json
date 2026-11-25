@@ -1,0 +1,10 @@
+{
+   "blockdevices": [
+      {"name": "loop0", "path": "/dev/loop0", "size": 912261120, "model": null, "type": "loop", "tran": null, "rm": false, "ro": true},
+      {"name": "sda", "path": "/dev/sda", "size": 31004295168, "model": "SanDisk Ultra   ", "type": "disk", "tran": "usb", "rm": true, "ro": false},
+      {"name": "nvme0n1", "path": "/dev/nvme0n1", "size": 1024209543168, "model": "WD PC SN810 SDCQNRY-1T00-1201", "type": "disk", "tran": "nvme", "rm": false, "ro": false},
+      {"name": "sdb", "path": "/dev/sdb", "size": 500107862016, "model": "Samsung SSD 870", "type": "disk", "tran": "sata", "rm": false, "ro": false},
+      {"name": "sr0", "path": "/dev/sr0", "size": 1073741312, "model": "DVD-RW", "type": "rom", "tran": "sata", "rm": true, "ro": false},
+      {"name": "zram0", "path": "/dev/zram0", "size": 4294967296, "model": null, "type": "disk", "tran": null, "rm": false, "ro": false}
+   ]
+}

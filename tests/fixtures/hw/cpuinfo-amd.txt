@@ -1,0 +1,4 @@
+processor	: 0
+vendor_id	: AuthenticAMD
+cpu family	: 25
+model name	: AMD Ryzen 7 5800X 8-Core Processor

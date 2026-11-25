@@ -1,0 +1,2 @@
+00:02.0 "VGA compatible controller [0300]" "Intel Corporation [8086]" "HD Graphics 620 [5916]" -r02 "Apple Inc. [106b]" "Device [0179]"
+03:00.0 "Network controller [0280]" "Broadcom Inc. and subsidiaries [14e4]" "BCM4350 802.11ac Wireless Network Adapter [43a3]" -r08 "Apple Inc. [106b]" "Device [0133]"

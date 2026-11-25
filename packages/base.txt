@@ -9,7 +9,6 @@ linux-headers
 linux-firmware
 sof-firmware            # Intel SOF audio; without it many laptops have no sound, so no speech
 networkmanager
-iwd
 sudo
 efibootmgr
 grub                    # BIOS installs; UEFI installs use systemd-boot
