@@ -88,6 +88,14 @@ blinux/
 │   ├── blinux-config/         # config package (see the `blinux-config` section)
 │   └── blinux-meta/           # blinux-base, blinux-hep, blinux-ml, blinux-ml-cuda, blinux-aster, blinux-docs
 ├── installer/                 # talking install script
+├── tests/
+│   ├── static/                # package list rules, README command check
+│   ├── unit/                  # bats-core tests
+│   ├── fixtures/              # lspci, lsblk, cpuinfo samples; install configs; dotfiles repo
+│   ├── integration/           # pytest + QEMU harness (ISO, install, first boot)
+│   ├── a11y/                  # AT-SPI, Orca log and speech tests
+│   └── manual/                # release checklist
+├── Makefile                   # lint, unit, packages, iso, test-iso, test-a11y, test
 ├── scripts/
 │   ├── harvest-packages.sh    # derive lists from the author's machine
 │   ├── build-repo.sh
@@ -326,12 +334,102 @@ These are the optional `blinux-hep`, `blinux-ml` and `blinux-ml-cuda` meta-packa
   3. Upload the ISO + `sha256sums` + signature as an artifact or release.
 - Monthly scheduled rebuild to track Arch updates.
 
-### 17. Testing
+### 17. Testing suite
 
-- **Automated:** boot the ISO in QEMU (`run_archiso -i out/*.iso` or plain `qemu-system-x86_64 -audiodev pa,...`). Check that `espeakup` is active via `systemctl is-active`, run the installer non-interactively with a test config, boot the installed image, and assert that GDM's dconf has the screen reader enabled and that `yay --version` works for the new user.
-- **Speech capture:** route QEMU audio to a WAV file and check that it isn't silent at key points (boot menu, installer prompt, GDM, desktop).
-- **Audio coexistence:** in the installed image, assert that `pactl info` reports PulseAudio, `pipewire-pulse` is absent, `$XDG_SESSION_TYPE` is `wayland`, and speech keeps working after switching between a TTY and the desktop (Ctrl+Alt+F3, then back).
-- **Manual (essential):** a full install with the monitor off, using only speech, on real hardware, including USB audio and Bluetooth headphones. Ideally with blind testers from the community (e.g. the Arch accessibility mailing list or the Orca users list).
+Testing comes in six layers, from seconds-long checks on every commit to a release-time test with the screen off. Everything automated lives in `tests/` and runs locally through the `Makefile` with the same commands CI uses, so a failure in CI can always be reproduced on the author's machine.
+
+| Layer | What | Tooling | When |
+|-------|------|---------|------|
+| 1. Static | lint, config validity, package list rules | shellcheck, shfmt, namcap, markdownlint, lychee | every push / PR |
+| 2. Unit | installer and helper logic | bats-core (pytest if the installer moves to Python) | every push / PR |
+| 3. Package | PKGBUILDs build, install and resolve | devtools clean chroot, `pacstrap`, `arch-nspawn` | PRs touching `pkgbuilds/` or `packages/`, nightly |
+| 4. ISO + install | boot, speech, unattended installs in QEMU | QEMU/KVM, OVMF, pytest + pexpect + QMP | smoke on PRs, full matrix nightly |
+| 5. Accessibility | Orca, AT-SPI and speech inside the installed desktop | pytest, python-atspi / dogtail, Orca debug log, speech-to-text | nightly, release |
+| 6. Manual / hardware | real machines, screen off, blind testers | checklist in `tests/manual/` | every release |
+
+#### Layer 1: static checks (`make lint`)
+
+- `shellcheck` and `shfmt -d` on `scripts/`, `installer/`, and the `blinux-*` helpers.
+- `namcap` on every `PKGBUILD`. Check that `.SRCINFO` is up to date (`makepkg --printsrcinfo | diff - .SRCINFO`).
+- **Package list rules** (`tests/static/check-package-lists.sh`):
+  - Every name in `packages/*.txt` exists in the official repos or `[blinux]` (`pacman -Si` / `expac -S`). No duplicates across lists.
+  - **Deny-list**: `pipewire-pulse`, `wireplumber` and `xorg-server` never appear (audio and Wayland decisions). `nvidia*`, `cuda*` and `cudnn` never appear in `base.txt` or `profile/packages.x86_64` (the proprietary-at-install-time rule).
+  - `sof-firmware`, `espeakup`, `orca`, `speech-dispatcher`, `xorg-xwayland`, `yay`, `base-devel` and `git` are always in the base stack.
+- **Config validity**:
+  - `systemd-analyze verify` on units and drop-ins.
+  - `dconf compile` on the `gdm.d` and `local.d` databases.
+  - `desktop-file-validate` on autostart entries.
+  - `emacs --batch -f batch-byte-compile` on the site-start files.
+  - JSON schema validation of the installer's `archinstall` configs.
+  - `visudo -cf` on the sudoers drop-in.
+- **Docs**: markdownlint, and `lychee` link checks on `README.md` and `docs/`. A **README command check** pulls the fenced `sh` blocks out of the README, runs `bash -n` on each, and confirms that every `./scripts/...` or `blinux-*` command it names exists in the repo. That way the README can't drift from the scripts (see "README").
+
+#### Layer 2: unit tests (`make unit`)
+
+bats-core tests in `tests/unit/`, with fixtures in `tests/fixtures/`:
+
+- **GPU detection**: recorded `lspci` outputs (Intel Iris Xe like the author's machine, AMD, NVIDIA Turing+, older NVIDIA, hybrid Intel+NVIDIA) map to the right suggested driver choice and package set.
+- **Stack selection**: every combination of optional stacks × driver choice produces the expected package list. ML + CUDA gives `blinux-ml-cuda`, and CUDA without an NVIDIA choice is rejected.
+- **Microcode** detection from `/proc/cpuinfo` fixtures.
+- **Disk listing**: fake `lsblk -J` output is read aloud in the right order, and the double-confirmation can't be skipped.
+- **Offline mode**: with no network, the installer skips optional stacks and drivers and prints the spoken warning text.
+- **`blinux-console-speech`**: run against a temporary root (`DESTDIR`). `enable` writes the PulseAudio and espeakup drop-ins and `disable` removes them. Both are idempotent.
+- **`blinux-drivers`**: switching mesa → NVIDIA → NVIDIA + CUDA → mesa edits the kernel command line, `mkinitcpio.conf` and the pacman hook correctly each way.
+- **Dotfiles hook**: clones from a local bare-repo fixture and runs its bootstrap as the new user, never as root.
+
+#### Layer 3: package tests (`make packages`)
+
+- Build every PKGBUILD in a clean chroot (`extra-x86_64-build`), then run `namcap` on the built package.
+- **Resolution matrix**: in a fresh `pacstrap`-ed chroot with `[blinux]` enabled, `pacman -Sp` (dry run) `blinux-base` plus every allowed combination of optional stacks and driver packages, which catches conflicts and missing deps without downloading GBs. CUDA packages only get this resolution check (there's no GPU in CI).
+- **Smoke tests inside `arch-nspawn`** after a real install of each package:
+  - `emacs --batch -l /usr/share/emacs/site-lisp/emacspeak/lisp/emacspeak-setup.el` loads with no errors.
+  - The espeak server starts and answers (`tclsh` script, `DTK_PROGRAM=espeak`).
+  - `espeak-ng --stdout "Blinux test" | wc -c` is non-zero.
+  - DECtalk renders a WAV file, and `aster-math` loads in batch Emacs with SBCL.
+  - `yay --version` works as a non-root user. `yay -S --noconfirm` of a tiny pinned AUR package runs nightly only, because it needs network.
+  - `root -b -q` and `python -c "import uproot, awkward"` for `blinux-hep`. `python -c "import torch, jax, sklearn"` for `blinux-ml`.
+
+#### Layer 4: ISO and install tests (`make test-iso`)
+
+A pytest harness in `tests/integration/` drives QEMU with KVM. It talks to the VM over the serial console (pexpect) and QMP (key presses, screenshots), and records audio with `-audiodev wav,id=snd0,path=<test>.wav -device intel-hda -device hda-duplex,audiodev=snd0`.
+
+- **Boot**: UEFI (OVMF) and BIOS (SeaBIOS). The speech entry is chosen automatically after the timeout with **no key pressed**, and `espeakup` is active.
+- **Speech is audible**: the recorded WAV has non-silent audio within N seconds of the shell prompt (RMS threshold). A **speech-to-text check** (offline Vosk or whisper.cpp model, cached in CI) confirms the welcome message mentions `blinux-install`.
+- **Unattended installs**: `blinux-install --config tests/fixtures/install/<case>.json` for each case:
+  - `minimal` (base only, mesa, no encryption)
+  - `encrypted`
+  - `console-speech` (espeakup opt-in)
+  - `all-stacks`
+  - `offline` (no network device, so the optional stacks are skipped)
+  - `nvidia-cuda` (resolution and config only: checks the kernel cmdline, mkinitcpio and pacman hook, but can't load the driver)
+- **First boot of the installed disk**, checked through a test-only systemd unit that writes results to the serial console:
+  - `gdm` is active, and Orca runs at the greeter (`pgrep -u gdm orca`). The greeter WAV is non-silent.
+  - The test user's session has `XDG_SESSION_TYPE=wayland`, and XWayland starts when an X11 client (`xeyes`) is launched.
+  - **Audio coexistence**: `pactl info` reports `pulseaudio`, `pipewire` and `pipewire-media-session` are running, `pipewire-pulse` is not installed, and speech-dispatcher's output is audible.
+  - **TTY hand-off** (`console-speech` case): send Ctrl+Alt+F3 over QMP, check that espeakup speaks through PulseAudio, switch back, and check that Orca still speaks.
+  - `zsh` is the login shell, the oh-my-zsh prompt is plain ASCII, `yay --version` works, and the `/etc/skel` configs are in place.
+  - The dotfiles case clones from a fixture repo served inside the VM's network.
+- On failure, keep the serial log, WAV files, QMP screenshots and the `journalctl` export as CI artifacts.
+
+#### Layer 5: accessibility tests (`make test-a11y`)
+
+These run inside the installed desktop VM from layer 4, as the test user.
+
+- **AT-SPI tree checks** (python-atspi / dogtail): GNOME Shell, Settings, Files, Console, Text Editor and Firefox expose focusable widgets with accessible names. Flag any unlabeled buttons on the main paths.
+- **Orca output**: start Orca with `--debug-file`, move focus through a scripted path (Activities → search → open Console → type a command), and check that the expected utterances appear in the log in order.
+- **Emacspeak**: in a terminal Emacs session, `M-x emacspeak-speak-line` produces speech (WAV non-silent, STT matches the line).
+- **No long silences**: across the whole scripted session, there's no gap of more than X seconds with no speech after a user action.
+
+#### Layer 6: manual and hardware testing (every release)
+
+The checklist in `tests/manual/release-checklist.md`, filled in per release and attached to the GitHub Release:
+
+- A full install with the **monitor off**, using only speech, on the author's machine (Intel SOF audio, Iris Xe), plus at least one AMD machine and one NVIDIA machine (driver choices 2 and 3, and a CUDA job really running on the GPU).
+- USB audio, Bluetooth headphones (with `pulseaudio-bluetooth`) and a braille display through `brltty`.
+- Suspend/resume and plugging in headphones, without speech dropping out.
+- AsTeR reading a real HEP paper's LaTeX.
+- **README walk-through**: a screen-reader user follows the README from start to finish (build → USB → install → post-install) without sighted help.
+- Feedback from blind testers in the community (Arch accessibility list, Orca users list), filed as issues with a `tester-feedback` label.
 
 ### 18. README: explanation and setup commands
 
@@ -372,7 +470,7 @@ Write the commands only once the scripts exist, and keep them in sync. Each PR t
 7. Package Software DECtalk and aster-math; test AsTeR on a LaTeX paper; enable SRE math in the base stack.
 8. Add the dotfiles hook.
 9. Add the `blinux-base` and optional meta-packages, the driver/CUDA installer step and `blinux-drivers`.
-10. Automated QEMU tests, then a full test with the screen off.
+10. Grow the testing suite alongside steps 1–9 (layers 1–2 from step 1, layer 3 from step 6, layer 4 from step 5), then add the layer 5 accessibility tests and run the layer 6 test with the screen off.
 11. Update the README with the explanation and the full command sequence (build → USB → install → post-install → troubleshooting). Follow it with only a screen reader to check it, then make the first tagged release.
 
 Throughout: every step above that adds a script or user-facing command also updates the README in the same commit.
