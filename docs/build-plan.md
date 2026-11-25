@@ -1,5 +1,18 @@
 # Blinux Build Plan
 
+> **Status (2026-11-25):** this plan has been implemented; see [build-log.md](build-log.md)
+> for what was built, how it was verified, and where the implementation deliberately
+> differs from the plan below:
+> - the installer uses plain Arch tools instead of wrapping archinstall
+> - Emacspeak and AsTeR live in `/opt/emacspeak`, Raman's layout and the one the
+>   author's dotfiles load from
+> - Emacspeak's own js/node math server (MathJax + Speech Rule Engine) replaces a
+>   separate speech-rule-engine package
+> - Software DECtalk is proprietary, so it's built only on the user's machine
+>   (`blinux-aster-setup`), never published
+> - JAX and uproot/awkward/hist come from PyPI per project instead of the stacks
+> - the stable repo is published only after the release ISO passes its tests
+
 ## Summary
 
 Blinux is an Arch Linux–based distribution for blind and visually impaired users. It ships as a bootable ISO that talks from the first second: the live environment uses `espeakup` (the speakup console screen reader driven by eSpeak NG), just like the official Arch ISO's accessible boot entry. The installed system boots into a **GNOME Wayland** session (with **XWayland** for X11 apps) and uses **Orca** as the screen reader, uses **zsh + oh-my-zsh** as the default shell, and comes with **Emacs + Emacspeak** for coding and **Aster** for listening to math and technical documents. The **`yay` AUR helper** is installed and ready to use from first boot. It's also set up to work with the `OrghoN/.dotfiles` repository, and it ships development stacks for **high energy physics (HEP)** and **machine learning (ML)**.
