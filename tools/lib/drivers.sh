@@ -134,7 +134,11 @@ apply_graphics() {
 
 # current_graphics: what the system at $ROOT is set up for
 current_graphics() {
-    if [[ -f "$(rootpath "$NVIDIA_MKINITCPIO")" ]]; then
+    local recorded
+    recorded="$(rootpath /etc/blinux/graphics)"
+    if [[ -f "$recorded" ]] && graphics_valid "$(cat "$recorded")"; then
+        cat "$recorded"
+    elif [[ -f "$(rootpath "$NVIDIA_MKINITCPIO")" ]]; then
         if [[ -d "$(rootpath /opt/cuda)" ]]; then echo nvidia-cuda; else echo nvidia; fi
     else
         echo open

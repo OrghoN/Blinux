@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# blinux-drivers: switch graphics drivers after installation.
+#
+# Usage:
+#   sudo blinux-drivers                 ask which driver to use
+#   sudo blinux-drivers open|nvidia|nvidia-cuda
+#   blinux-drivers --status             say what is set up now
+#
+# Options:
+#   --root DIR      operate on a system mounted at DIR
+#   --yes           don't ask for confirmation
+#   --no-packages   only change configuration, don't install or remove packages
+#
+# Uses the same logic as the installer: packages from
+# /usr/share/blinux/packages, plus for NVIDIA the kernel command line
+# (nvidia_drm.modeset=1, so GNOME stays on Wayland), early module loading and
+# an initramfs pacman hook. Switching back to open removes all of that and the
+# NVIDIA and CUDA packages.
+set -euo pipefail
+
+here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+if [[ -f "$here/../lib/common.sh" ]]; then lib="$here/../lib"; else lib=/usr/lib/blinux; fi
+# shellcheck source=tools/lib/common.sh
+source "$lib/common.sh"
+# shellcheck source=tools/lib/detect.sh
+source "$lib/detect.sh"
+# shellcheck source=tools/lib/drivers.sh
+source "$lib/drivers.sh"
+
+choice=""
+YES=0
+PACKAGES=1
+STATUS=0
+while (($#)); do
+    case "$1" in
+        open | nvidia | nvidia-cuda) choice="$1"; shift ;;
+        --root) ROOT="$2"; shift 2 ;;
+        --yes) YES=1; shift ;;
+        --no-packages) PACKAGES=0; shift ;;
+        --status) STATUS=1; shift ;;
+        -h | --help) sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 0 ;;
+        *) die "unknown argument: $1 (try --help)" ;;
+    esac
+done
+
+current="$(current_graphics)"
+if ((STATUS)); then
+    say "This system uses $(graphics_describe "$current")."
+    exit 0
+fi
+
+if [[ -z "$choice" ]]; then
+    default=1
+    [[ "$(suggested_graphics)" == nvidia ]] && default=2
+    say "This system uses $(graphics_describe "$current")."
+    n="$(choose "Which graphics drivers do you want?" "$default" \
+        "open source drivers" "NVIDIA proprietary drivers" "NVIDIA proprietary drivers with CUDA")"
+    case "$n" in 1) choice=open ;; 2) choice=nvidia ;; 3) choice=nvidia-cuda ;; esac
+fi
+graphics_valid "$choice" || die "unknown driver choice: $choice"
+
+if [[ "$choice" == "$current" ]]; then
+    say "Nothing to do: this system already uses $(graphics_describe "$choice")."
+    exit 0
+fi
+if [[ "$choice" != open ]] && ! has_gpu nvidia; then
+    warn "No NVIDIA graphics card was found. The NVIDIA driver won't do anything here."
+fi
+if [[ "$choice" != open ]] && has_gpu nvidia legacy && ! has_gpu nvidia turing+; then
+    warn "This NVIDIA card is older than Turing, which nvidia-open doesn't support."
+fi
+if ((!YES)) && ! ask_yes_no "Switch from $(graphics_describe "$current") to $(graphics_describe "$choice")?" yes; then
+    say "Nothing was changed."
+    exit 0
+fi
+if [[ "$DRY_RUN" != 1 && $EUID -ne 0 && ! -w "$(rootpath /etc)" ]]; then
+    die "Run this with sudo."
+fi
+
+pacman_() {
+    if [[ "$ROOT" == / ]]; then run pacman "$@"; else run pacman --root "$ROOT" "$@"; fi
+}
+
+if ((PACKAGES)); then
+    mapfile -t wanted < <(graphics_packages "$choice")
+    mapfile -t nvidia_all < <(graphics_packages nvidia-cuda)
+    remove=()
+    for pkg in "${nvidia_all[@]}"; do
+        if ! printf '%s\n' "${wanted[@]}" | grep -qxF "$pkg" && pacman -Qq "$pkg" >/dev/null 2>&1; then
+            remove+=("$pkg")
+        fi
+    done
+    say "Installing: ${wanted[*]}."
+    pacman_ -S --needed --noconfirm "${wanted[@]}"
+    if ((${#remove[@]})); then
+        say "Removing: ${remove[*]}."
+        pacman_ -Rns --noconfirm "${remove[@]}"
+    fi
+fi
+
+apply_graphics "$choice"
+write_file /etc/blinux/graphics <<<"$choice"
+chroot_run mkinitcpio -P
+say "Done. Restart the computer to use $(graphics_describe "$choice")."
