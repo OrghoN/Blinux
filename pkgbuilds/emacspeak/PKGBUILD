@@ -6,6 +6,10 @@
 #   make config && make
 #   cd servers/native-espeak && make
 #
+# plus "npm install" in js/node (Raman's js/node/Readme.org), which brings in
+# MathJax and the Speech Rule Engine for spoken math, pinned by the upstream
+# package-lock.json.
+#
 # and installed as a whole tree in /opt/emacspeak, the layout Raman uses and
 # the one the author's dotfiles load from:
 #
@@ -22,7 +26,8 @@ pkgdesc="The complete audio desktop: spoken output for Emacs (T.V. Raman), with 
 arch=('x86_64')
 url="https://github.com/tvraman/emacspeak"
 license=('GPL-2.0-or-later')
-depends=('emacs' 'tcl' 'tclx' 'espeak-ng' 'sox')
+depends=('emacs' 'tcl' 'tclx' 'espeak-ng' 'sox' 'nodejs')
+makedepends=('npm')
 optdepends=('dectalk: Software DECtalk voice (dtk-soft server), used by AsTeR'
             'python: some Emacspeak utilities'
             'perl: some Emacspeak utilities')
@@ -38,14 +43,18 @@ build() {
   export DTK_PROGRAM=espeak
   make config
   make
-  cd servers/native-espeak
-  make TCL_INCLUDE=/usr/include
+  make -C servers/native-espeak TCL_INCLUDE=/usr/include
+  # Spoken math: MathJax + Speech Rule Engine for js/node/math-server.js.
+  cd js/node
+  npm ci --omit=dev --no-audit --no-fund --cache "$srcdir/npm-cache"
 }
 
 check() {
   cd "emacspeak-${pkgver}"
   # The eSpeak server module loads into Tcl (and initialises eSpeak NG).
   echo 'load servers/native-espeak/tclespeak.so; exit' | tclsh
+  # The math server's dependencies resolve.
+  (cd js/node && node -e "require('speech-rule-engine'); require('mathjax')")
   # The setup file Raman's instructions load must bring up Emacspeak.
   emacs --batch -Q --eval '(progn
       (setq dtk-program "espeak" emacspeak-play-emacspeak-startup-icon nil)

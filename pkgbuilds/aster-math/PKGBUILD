@@ -1,0 +1,68 @@
+# Maintainer: OrghoN <https://github.com/OrghoN>
+#
+# AsTeR, Audio System for Technical Readings (T.V. Raman), for spoken math
+# on the Emacspeak audio desktop. Follows Raman's blog post "AsTeR: Spoken
+# Math On The Emacspeak Audio Desktop" (2022-12-21):
+#
+#   prerequisites: Emacspeak 57 or later, slime, auctex, flex, SBCL, cl-asdf,
+#                  Software DECtalk
+#   cd <emacspeak-dir>
+#   git clone https://github.com/tvraman/aster-math
+#   cd aster-math/lisp && make
+#   then add aster-math/ui/ to load-path, M-x load-library aster, M-x aster
+#
+# Installed at /opt/emacspeak/aster-math, inside the Emacspeak tree as the post
+# describes. AsTeR speaks through Emacspeak's Software DECtalk server
+# (servers/software-dtk), which is built here against the dectalk package.
+
+pkgname=aster-math
+_commit=8e4e4dd1fa503e026fe3ec0b9f25d5fd54c8eea3
+pkgver=20230817
+pkgrel=1
+pkgdesc="AsTeR: spoken math for LaTeX documents on the Emacspeak audio desktop (T.V. Raman)"
+arch=('x86_64')
+url="https://github.com/tvraman/aster-math"
+# Upstream has no license file yet.
+license=('LicenseRef-unspecified')
+depends=('emacspeak>=57' 'dectalk' 'sbcl' 'flex' 'emacs-slime' 'auctex' 'tcl')
+makedepends=('git')
+source=("aster-math::git+https://github.com/tvraman/aster-math.git#commit=${_commit}"
+        "60-aster.el")
+sha256sums=('SKIP'
+            'SKIP')
+
+build() {
+  # ASDF compiles into the user's cache at runtime; keep build-time output
+  # inside $srcdir.
+  export XDG_CACHE_HOME="$srcdir/cache"
+
+  # Raman's "cd aster-math/lisp && make" runs these two steps. The lexer is
+  # K&R-era C, which GCC 15's default C23 rejects, so build it as gnu17.
+  cd "$srcdir/aster-math/lisp"
+  sbcl --script aster.lisp
+  make -C lexer CFLAGS="-O2 -std=gnu17"
+
+  # Emacspeak's Software DECtalk server, so AsTeR can speak with DECtalk.
+  rm -rf "$srcdir/software-dtk"
+  cp -r /opt/emacspeak/servers/software-dtk "$srcdir/software-dtk"
+  make -C "$srcdir/software-dtk" TCL_INCLUDE=/usr/include \
+    CFLAGS="$CFLAGS -fPIC -I/usr/include/dectalk -I/usr/include" \
+    LDFLAGS="$LDFLAGS -L/usr/lib/dectalk"
+}
+
+check() {
+  test -x "$srcdir/aster-math/lisp/lexer/lispify"
+  test -f "$srcdir/software-dtk/tcldtk.so"
+}
+
+package() {
+  install -d "$pkgdir/opt/emacspeak/aster-math"
+  cp -a --no-preserve=ownership "$srcdir/aster-math/." "$pkgdir/opt/emacspeak/aster-math/"
+  rm -rf "$pkgdir/opt/emacspeak/aster-math/.git"
+  find "$pkgdir/opt/emacspeak/aster-math" -name '*.fasl' -delete
+
+  install -Dm755 "$srcdir/software-dtk/tcldtk.so" \
+    "$pkgdir/opt/emacspeak/servers/software-dtk/tcldtk.so"
+  install -Dm644 "$srcdir/60-aster.el" \
+    "$pkgdir/usr/share/emacs/site-lisp/site-start.d/60-aster.el"
+}

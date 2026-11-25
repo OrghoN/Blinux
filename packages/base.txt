@@ -73,7 +73,7 @@ emacs
 emacspeak
 tcl
 tclx                    # Emacspeak's Tcl speech servers need it
-speech-rule-engine      # spoken math in Emacspeak without AsTeR ("poor man's AsTeR")
+nodejs                  # runs Emacspeak's math server (MathJax + Speech Rule Engine, "poor man's AsTeR")
 
 # --- Core development
 gcc
@@ -84,7 +84,6 @@ gdb
 python
 python-pip
 uv
-nodejs
 npm
 jq
 

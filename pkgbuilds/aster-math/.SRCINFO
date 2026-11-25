@@ -1,0 +1,21 @@
+pkgbase = aster-math
+	pkgdesc = AsTeR: spoken math for LaTeX documents on the Emacspeak audio desktop (T.V. Raman)
+	pkgver = 20230817
+	pkgrel = 1
+	url = https://github.com/tvraman/aster-math
+	arch = x86_64
+	license = LicenseRef-unspecified
+	makedepends = git
+	depends = emacspeak>=57
+	depends = dectalk
+	depends = sbcl
+	depends = flex
+	depends = emacs-slime
+	depends = auctex
+	depends = tcl
+	source = aster-math::git+https://github.com/tvraman/aster-math.git#commit=8e4e4dd1fa503e026fe3ec0b9f25d5fd54c8eea3
+	source = 60-aster.el
+	sha256sums = SKIP
+	sha256sums = SKIP
+
+pkgname = aster-math
