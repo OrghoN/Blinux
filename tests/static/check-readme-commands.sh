@@ -36,10 +36,14 @@ for b in "${blocks[@]}"; do
     done < <(grep -oE '(\./)?scripts/[A-Za-z0-9_./-]+' "$b" | sort -u)
     while read -r cmd; do
         [[ -x "tools/bin/$cmd" ]] || err "names the command $cmd, which is not in tools/bin"
-    done < <(grep -oE '(^|[[:space:]])blinux-[a-z-]+' "$b" | tr -d '[:space:]' | sort -u | grep -v '^blinux-\(base\|aster\|docs\|hep\|ml\|ml-cuda\|config\|tools\|keyring\|testing\)$' || true)
+    done < <(grep -oE '(^|[[:space:]])blinux-[a-z-]+' "$b" | sed 's/^[[:space:]]*//' | sort -u |
+        grep -v '^blinux-\(base\|aster\|docs\|hep\|ml\|ml-cuda\|config\|tools\|keyring\|testing\)$' || true)
+    # "make TARGET" must be one of ours, until the block cd's into another
+    # project (e.g. the Emacspeak build steps, which use Emacspeak's Makefile).
     while read -r target; do
         grep -qxF "$target" <<<"$targets" || err "runs make $target, which is not a Makefile target"
-    done < <(grep -oE '(^|[[:space:]])make [a-z][a-z0-9-]*' "$b" | awk '{print $2}' | sort -u)
+    done < <(awk '/^[[:space:]]*cd / && $2 != "Blinux" {exit} {print}' "$b" |
+        grep -oE '(^|[[:space:]])make [a-z][a-z0-9-]*' | awk '{print $2}' | sort -u)
 done
 
 if ((fail)); then exit 1; fi
