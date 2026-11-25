@@ -1,0 +1,16 @@
+pkgbase = blinux-config
+	pkgdesc = Blinux system configuration: Orca at login, speech defaults, Wayland, zsh and yay defaults
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/OrghoN/Blinux
+	install = blinux-config.install
+	arch = any
+	license = GPL-3.0-or-later
+	depends = blinux-tools
+	depends = dconf
+	depends = sudo
+	backup = etc/dconf/db/local.d/00-blinux
+	backup = etc/dconf/db/gdm.d/00-blinux
+	backup = etc/speech-dispatcher/clients/00-blinux.conf
+
+pkgname = blinux-config

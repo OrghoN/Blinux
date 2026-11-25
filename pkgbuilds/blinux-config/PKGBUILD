@@ -1,0 +1,26 @@
+# Maintainer: OrghoN <https://github.com/OrghoN>
+#
+# All Blinux system configuration in one package, so installed systems get
+# config updates through pacman -Syu. build-repo.sh stages config/ into files/.
+
+pkgname=blinux-config
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Blinux system configuration: Orca at login, speech defaults, Wayland, zsh and yay defaults"
+arch=('any')
+url="https://github.com/OrghoN/Blinux"
+license=('GPL-3.0-or-later')
+depends=('blinux-tools' 'dconf' 'sudo')
+backup=('etc/dconf/db/local.d/00-blinux'
+        'etc/dconf/db/gdm.d/00-blinux'
+        'etc/speech-dispatcher/clients/00-blinux.conf')
+install=blinux-config.install
+source=()
+
+package() {
+  local files="$startdir/files"
+  [[ -d "$files/etc" ]] || { echo "files/ not staged: run scripts/build-repo.sh" >&2; return 1; }
+  cp -a --no-preserve=ownership "$files/." "$pkgdir/"
+  chmod 0750 "$pkgdir/etc/sudoers.d"
+  chmod 0440 "$pkgdir/etc/sudoers.d/10-blinux-wheel"
+}

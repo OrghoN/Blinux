@@ -1,0 +1,6 @@
+# Installed by "blinux-console-speech enable".
+# Lets espeakup (a root system service) speak through the logged-in user's
+# PulseAudio instead of fighting it for the sound card.
+.ifexists module-native-protocol-unix.so
+load-module module-native-protocol-unix auth-anonymous=1 socket=/tmp/blinux-pulse.sock
+.endif

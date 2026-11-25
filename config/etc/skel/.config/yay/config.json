@@ -1,0 +1,13 @@
+{
+  "diffmenu": false,
+  "editmenu": false,
+  "cleanmenu": false,
+  "answerclean": "None",
+  "answerdiff": "None",
+  "answeredit": "None",
+  "cleanAfter": true,
+  "removemake": "yes",
+  "sudoloop": true,
+  "combinedupgrade": true,
+  "bottomup": true
+}

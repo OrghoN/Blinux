@@ -1,0 +1,24 @@
+# Maintainer: OrghoN <https://github.com/OrghoN>
+#
+# The Blinux installer and helper commands. build-repo.sh stages tools/ and
+# packages/ from the repository into files/ before building.
+
+pkgname=blinux-tools
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Blinux talking installer and helpers (blinux-install, blinux-drivers, blinux-console-speech, blinux-dotfiles)"
+arch=('any')
+url="https://github.com/OrghoN/Blinux"
+license=('GPL-3.0-or-later')
+depends=('bash' 'jq' 'util-linux' 'pciutils' 'gptfdisk' 'dosfstools' 'cryptsetup'
+         'arch-install-scripts' 'git' 'iproute2')
+source=()
+
+package() {
+  local files="$startdir/files"
+  [[ -d "$files/tools" ]] || { echo "files/ not staged: run scripts/build-repo.sh" >&2; return 1; }
+  install -Dm755 -t "$pkgdir/usr/bin" "$files"/tools/bin/*
+  install -Dm644 -t "$pkgdir/usr/lib/blinux" "$files"/tools/lib/*.sh
+  install -Dm644 -t "$pkgdir/usr/share/blinux" "$files"/tools/share/*
+  install -Dm644 -t "$pkgdir/usr/share/blinux/packages" "$files"/packages/*.txt
+}

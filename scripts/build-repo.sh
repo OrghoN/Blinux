@@ -141,12 +141,18 @@ stage_aur() {
     echo "$dest"
 }
 
+package_list() {
+    # Packages makepkg would produce, minus -debug packages (debug builds are
+    # optional and never produced for arch=any).
+    (cd "$1" && as_user makepkg --packagelist 2>/dev/null) | grep -v -- '-debug-' || true
+}
+
 already_built() {
     local dir="$1" f
     ((FORCE)) && return 1
     while read -r f; do
         [[ -f "$REPO_DIR/$(basename "$f")" ]] || return 1
-    done < <(cd "$dir" && as_user makepkg --packagelist 2>/dev/null)
+    done < <(package_list "$dir")
     return 0
 }
 
@@ -177,7 +183,7 @@ add_to_repo() {
         [[ -f "$f" ]] || die "expected package not built: $f"
         cp -f "$f" "$REPO_DIR/"
         pkgs+=("$REPO_DIR/$(basename "$f")")
-    done < <(cd "$dir" && as_user makepkg --packagelist)
+    done < <(package_list "$dir")
     if [[ -n "${GPGKEY:-}" ]]; then
         for f in "${pkgs[@]}"; do
             gpg --batch --yes --detach-sign --use-agent -u "$GPGKEY" "$f"

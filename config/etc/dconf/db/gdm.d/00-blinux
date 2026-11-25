@@ -1,0 +1,6 @@
+# Blinux: Orca speaks at the GDM login screen.
+[org/gnome/desktop/a11y/applications]
+screen-reader-enabled=true
+
+[org/gnome/desktop/a11y]
+always-show-universal-access-status=true

@@ -1,0 +1,25 @@
+# Blinux default zsh configuration, sourced from ~/.zshrc (copied from /etc/skel).
+# Replace ~/.zshrc freely (your dotfiles will); nothing here is required for speech.
+
+# oh-my-zsh from the system package (oh-my-zsh-git), with a writable cache.
+export ZSH=/usr/share/oh-my-zsh
+export ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/oh-my-zsh"
+mkdir -p "$ZSH_CACHE_DIR/completions"
+ZSH_THEME=""                     # no theme: themes add symbols screen readers read out
+DISABLE_AUTO_UPDATE=true         # updates come from pacman
+DISABLE_UNTRACKED_FILES_DIRTY=true
+plugins=(git sudo history-substring-search)
+# zsh-autosuggestions is left off: inline suggestions are noisy with speakup.
+[[ -r "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
+
+# Plain ASCII prompt, no right prompt.
+PROMPT='%n@%m %~ %# '
+RPROMPT=''
+
+# Screen readers on the console: one line of editing instead of redrawing.
+if [[ "$TERM" == linux ]]; then
+    setopt SINGLE_LINE_ZLE
+fi
+
+export EDITOR=emacs
+command -v zoxide >/dev/null && eval "$(zoxide init zsh)"

@@ -1,1 +1,3 @@
 # Blinux packages from pkgbuilds/, built in this order after the AUR packages.
+blinux-tools
+blinux-config

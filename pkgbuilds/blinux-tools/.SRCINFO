@@ -1,0 +1,19 @@
+pkgbase = blinux-tools
+	pkgdesc = Blinux talking installer and helpers (blinux-install, blinux-drivers, blinux-console-speech, blinux-dotfiles)
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/OrghoN/Blinux
+	arch = any
+	license = GPL-3.0-or-later
+	depends = bash
+	depends = jq
+	depends = util-linux
+	depends = pciutils
+	depends = gptfdisk
+	depends = dosfstools
+	depends = cryptsetup
+	depends = arch-install-scripts
+	depends = git
+	depends = iproute2
+
+pkgname = blinux-tools

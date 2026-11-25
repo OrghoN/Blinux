@@ -1,0 +1,21 @@
+# Blinux defaults for every user session. Users can still change all of these
+# in Settings (or with gsettings); these are defaults, not locks.
+
+[org/gnome/desktop/a11y/applications]
+screen-reader-enabled=true
+
+[org/gnome/desktop/a11y]
+always-show-universal-access-status=true
+
+[org/gnome/desktop/interface]
+enable-animations=false
+cursor-size=32
+toolkit-accessibility=true
+
+[org/gnome/desktop/a11y/keyboard]
+# Toggle accessibility features from the keyboard
+enable=true
+
+[org/gnome/settings-daemon/plugins/media-keys]
+# Super+Alt+S toggles Orca (GNOME's default binding, set explicitly)
+screenreader=['<Super><Alt>s']
